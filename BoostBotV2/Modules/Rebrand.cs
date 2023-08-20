@@ -14,7 +14,7 @@ public class Rebrand : BoostModuleBase
     public async Task RebrandAsync()
     {
         var nodeVersion = Extensions.ExecuteCommand("node -v");
-        if (!string.IsNullOrWhiteSpace(nodeVersion))
+        if (string.IsNullOrWhiteSpace(nodeVersion))
         {
             await Context.Channel.SendErrorAsync("Node is not installed. Install it and try again.");
             return;

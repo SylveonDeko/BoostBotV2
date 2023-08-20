@@ -49,18 +49,37 @@ public static class Extensions
     
     public static string ExecuteCommand(string cmd)
     {
-        var process = new Process
+        Process process;
+        if (Environment.OSVersion.Platform == PlatformID.Win32NT)
         {
-            StartInfo = new ProcessStartInfo
+            process = new Process
             {
-                FileName = "/bin/bash",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                Arguments = $"-c \"{cmd}\""
-            }
-        };
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    Arguments = $"/c {cmd}"
+                }
+            };
+        }
+        else
+        {
+            process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = "/bin/bash",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    Arguments = $"-c \"{cmd}\""
+                }
+            };
+        }
 
         process.Start();
         var result = process.StandardOutput.ReadToEnd();

@@ -40,7 +40,9 @@
         <None Update="BoostBot.db-wal">
           <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
-        <None Update="creds.yml" />
+        <None Update="creds.yml">
+          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
     </ItemGroup>
 
 </Project>

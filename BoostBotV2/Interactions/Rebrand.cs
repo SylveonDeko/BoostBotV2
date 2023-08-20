@@ -52,13 +52,14 @@ public class Rebrand : InteractionModuleBase
             };
             
             Extensions.ExecuteCommand($"git clone git@github.com:SylveonDeko/BoostBotV2 ~/{clientId}");
+            var homePath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             
-            SerializeYml.Serialize(creds, $"~/{clientId}/BoostBotV2/creds.yml");
-            Extensions.ExecuteCommand($"cp tokens.txt ~/{clientId}/BoostBotV2/");
-            Extensions.ExecuteCommand($"cp onlinetokens.txt ~/{clientId}/BoostBotV2/");
-            Extensions.ExecuteCommand($"cp BoostBot.db ~/{clientId}/BoostBotV2/");
-            Extensions.ExecuteCommand($"cp BoostBot.db-shm ~/{clientId}/BoostBotV2/");
-            Extensions.ExecuteCommand($"cp BoostBot.db-wal ~/{clientId}/BoostBotV2/");
+            SerializeYml.Serialize(creds, $"{homePath}/{clientId}/BoostBotV2/creds.yml");
+            Extensions.ExecuteCommand($"cp tokens.txt {homePath}/{clientId}/BoostBotV2/");
+            Extensions.ExecuteCommand($"cp onlinetokens.txt {homePath}/{clientId}/BoostBotV2/");
+            Extensions.ExecuteCommand($"cp BoostBot.db {homePath}/{clientId}/BoostBotV2/");
+            Extensions.ExecuteCommand($"cp BoostBot.db-shm {homePath}/{clientId}/BoostBotV2/");
+            Extensions.ExecuteCommand($"cp BoostBot.db-wal {homePath}/{clientId}/BoostBotV2/");
             Extensions.ExecuteCommand($"cd ~/{clientId}/BoostBotV2 && pm2 start --name {clientId} dotnet run");
             await Context.Interaction.RespondAsync("Rebrand complete.", ephemeral: true);
         }

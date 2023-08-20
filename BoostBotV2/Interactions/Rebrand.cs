@@ -60,7 +60,7 @@ public class Rebrand : InteractionModuleBase
             Extensions.ExecuteCommand($"cp BoostBot.db {homePath}/{clientId}/BoostBotV2/");
             Extensions.ExecuteCommand($"cp BoostBot.db-shm {homePath}/{clientId}/BoostBotV2/");
             Extensions.ExecuteCommand($"cp BoostBot.db-wal {homePath}/{clientId}/BoostBotV2/");
-            Extensions.ExecuteCommand($"pm2 start --name {clientId} \"dotnet run {homePath}/{clientId}/BoostBotV2/BoostBotV2.csproj\"");
+            Extensions.ExecuteCommand($"pm2 start --name {clientId} \"dotnet run --project {homePath}/{clientId}/BoostBotV2/BoostBotV2.csproj\"");
             await Context.Interaction.RespondAsync("Rebrand complete.", ephemeral: true);
         }
         catch (Exception e)

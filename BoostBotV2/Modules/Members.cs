@@ -1,0 +1,623 @@
+﻿using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
+using BoostBotV2.Common;
+using BoostBotV2.Common.Attributes.TextCommands;
+using BoostBotV2.Db;
+using BoostBotV2.Db.Models;
+using BoostBotV2.Services;
+using Discord;
+using Discord.Commands;
+using Discord.WebSocket;
+using Microsoft.EntityFrameworkCore;
+using Serilog;
+
+namespace BoostBotV2.Modules;
+
+public partial class Members : BoostModuleBase
+{
+    private readonly DiscordAuthService _discordAuthService;
+    private readonly DbService _db;
+    private readonly Bot _bot;
+    private readonly HttpClient _client;
+
+    private static readonly Dictionary<string, int> RoleAllowances = new()
+    {
+        { "free", 4 },
+        { "bronze", 5 },
+        { "silver", 10 },
+        { "gold", 20 },
+        { "platinum", 35 }
+    };
+
+    public Members(DiscordAuthService discordAuthService, DbService db, Bot bot, HttpClient client)
+    {
+        _discordAuthService = discordAuthService;
+        _db = db;
+        _bot = bot;
+        _client = client;
+    }
+
+    [Command("djoin")]
+    [Summary("Joins a server with the allowed member count for the users highest role")]
+    [Usage("djoin <guild id>")]
+    [IsCommandGuild]
+    [RateLimit(30)]
+    [IsMembersChannel]
+    public async Task JoinCommand(ulong guildId)
+    {
+        try
+        {
+            await using var uow = _db.GetDbContext();
+            var registry = await uow.MemberFarmRegistry.FirstOrDefaultAsync(x => x.GuildId == guildId);
+
+            if (uow.Blacklists.Select(x => x.BlacklistId).Contains(guildId))
+            {
+                await Context.Message.ReplyErrorAsync("That server ID is blacklisted.");
+                return;
+            }
+
+            if (registry is not null)
+            {
+                if (registry.UserId != Context.Message.Author.Id)
+                {
+                    await Context.Message.ReplyErrorAsync("You are not allowed to add members to this server. This account is not the one that registered this server.");
+                    return;
+                }
+            }
+            else
+            {
+                await uow.MemberFarmRegistry.AddAsync(new MemberFarmRegistry
+                {
+                    GuildId = guildId,
+                    UserId = Context.Message.Author.Id
+                });
+                await uow.SaveChangesAsync();
+            }
+
+            var guild = await Context.Client.GetGuildAsync(guildId);
+            if (guild == null)
+            {
+                var inviteUrl = $"https://discord.com/api/oauth2/authorize?client_id={Context.Client.CurrentUser.Id}&permissions=1&scope=bot%20applications.commands";
+                var button = new ComponentBuilder()
+                    .WithButton("Add To Server", style: ButtonStyle.Link, url: inviteUrl);
+                var embed = new EmbedBuilder()
+                    .WithTitle("Error")
+                    .WithDescription($"You need to invite the bot to the server before using this command.")
+                    .WithColor(Color.Red)
+                    .Build();
+                await Context.Message.ReplyAsync(embed: embed, components: button.Build());
+                return;
+            }
+
+            var curUser = await guild.GetUserAsync(Context.Client.CurrentUser.Id);
+            if (!curUser.GuildPermissions.Has(GuildPermission.CreateInstantInvite))
+            {
+                await Context.Message.ReplyErrorAsync("I don't have permission to add members in that server.");
+                return;
+            }
+
+            var authorRoles = (Context.Message.Author as SocketGuildUser)?.Roles;
+            var highestRole = authorRoles.MaxBy(role => RoleAllowances.TryGetValue(role.Name.ToLowerInvariant(), out var value) ? value : 0);
+
+            if (highestRole == null || !RoleAllowances.ContainsKey(highestRole.Name.ToLowerInvariant()))
+            {
+                await Context.Message.ReplyErrorAsync("You don't have permission to add users to any guild.");
+                return;
+            }
+
+            var getAllowedAddCount = await _discordAuthService.GetAllowedAddCount(Context.User.Id, highestRole.Name, guild.Id);
+            var numTokens = RoleAllowances[highestRole.Name.ToLowerInvariant()];
+
+            if (getAllowedAddCount != null)
+            {
+                if (getAllowedAddCount <= 0)
+                {
+                    await Context.Message.ReplyErrorAsync("You have reached your daily add limit.");
+                    return;
+                }
+
+                numTokens = Math.Min(numTokens, getAllowedAddCount.Value);
+            }
+
+            var tokens = _bot.Tokens;
+            var privateTokens = await _discordAuthService.GetPrivateStock(Context.User.Id);
+            if (privateTokens != null && privateTokens.Any())
+            {
+                if (await PromptUserConfirmAsync("Would you like to use your private stock?", Context.User.Id))
+                {
+                    tokens = privateTokens;
+                }
+            }
+
+            if (!tokens.Any())
+            {
+                await Context.Message.ReplyErrorAsync("# It seems we ran out of stock. Locking channel.");
+                var channel = Context.Channel as ITextChannel;
+                var current = channel.GetPermissionOverwrite(Context.Guild.EveryoneRole);
+                if (current.HasValue)
+                {
+                    var perms = current.Value.Modify(sendMessages: PermValue.Deny);
+                    await channel.AddPermissionOverwriteAsync(Context.Guild.EveryoneRole, perms);
+                }
+                await channel.SendMessageAsync("# Do not ask when we will restock. Do not ask why this channel is locked. We will tell you when we restock. Thinking with your ass and not looking with your eyes at this message will get you a timeout.");
+                return;
+            }
+
+            var successCount = 0;
+            var eb = new EmbedBuilder()
+                .WithColor(Color.Orange)
+                .WithDescription($"<a:loading:1136512164551741530> Adding {numTokens} members to the guild '{guild}' for the role '{highestRole.Name}'");
+            var message = await Context.Message.ReplyAsync(embed: eb.Build());
+
+            var usedTokens = new HashSet<string>();
+            var guildUsedTokens = uow.GuildsAdded.Where(x => x.GuildId == guild.Id).Select(x => x.Token).ToHashSet();
+            var availableTokens = new HashSet<string>(tokens.Except(guildUsedTokens));
+
+            foreach (var token in availableTokens)
+            {
+                if (successCount >= numTokens)
+                    break;
+                if (!await _discordAuthService.Authorizer(token, guild.Id.ToString())) continue;
+                successCount += 1;
+                usedTokens.Add(token);
+            }
+
+            if (successCount > 0)
+            {
+                var embed = new EmbedBuilder()
+                    .WithDescription($"✅ Added members to the guild '{guild}' for the role '{highestRole.Name}' ({successCount}/{numTokens} tokens used).")
+                    .WithColor(Color.Green)
+                    .Build();
+                await message.ModifyAsync(msg => msg.Embed = embed);
+                await uow.GuildsAdded.AddRangeAsync(usedTokens.Select(x => new GuildsAdded { GuildId = guild.Id, Token = x }));
+                await uow.SaveChangesAsync();
+            }
+            else
+            {
+                await Context.Message.ReplyErrorAsync("Failed to add members. No stock left to add to your server.");
+            }
+        }
+        catch (Exception e)
+        {
+            Log.Error("Error adding members: {Error}", e);
+        }
+    }
+
+
+    [Command("djoinonline")]
+    [Summary("Joins a server with the allowed member count for the users highest role (online mode)")]
+    [Usage("djoinonline <guild id>")]
+    [IsCommandGuild]
+    [RateLimit(30)]
+    [IsMembersChannel]
+    [IsPremium]
+    public async Task OnlineJoinCommand(ulong guildId)
+    {
+        try
+        {
+            await using var uow = _db.GetDbContext();
+            var registry = await uow.MemberFarmRegistry.FirstOrDefaultAsync(x => x.GuildId == guildId);
+
+            if (uow.Blacklists.Select(x => x.BlacklistId).Contains(guildId))
+            {
+                await Context.Message.ReplyErrorAsync("That server ID is blacklisted.");
+                return;
+            }
+
+            if (registry is not null)
+            {
+                if (registry.UserId != Context.Message.Author.Id)
+                {
+                    await Context.Message.ReplyErrorAsync("You are not allowed to add members to this server. This account is not the one that registered this server.");
+                    return;
+                }
+            }
+            else
+            {
+                await uow.MemberFarmRegistry.AddAsync(new MemberFarmRegistry
+                {
+                    GuildId = guildId,
+                    UserId = Context.Message.Author.Id
+                });
+                await uow.SaveChangesAsync();
+            }
+
+            var guild = await Context.Client.GetGuildAsync(guildId);
+            if (guild == null)
+            {
+                var inviteUrl = $"https://discord.com/api/oauth2/authorize?client_id={Context.Client.CurrentUser.Id}&permissions=1&scope=bot%20applications.commands";
+                var button = new ComponentBuilder()
+                    .WithButton("Add To Server", style: ButtonStyle.Link, url: inviteUrl);
+                var embed = new EmbedBuilder()
+                    .WithTitle("Error")
+                    .WithDescription($"You need to invite the bot to the server before using this command.")
+                    .WithColor(Color.Red)
+                    .Build();
+                await Context.Message.ReplyAsync(embed: embed, components: button.Build());
+                return;
+            }
+
+            var curUser = await guild.GetUserAsync(Context.Client.CurrentUser.Id);
+            if (!curUser.GuildPermissions.Has(GuildPermission.CreateInstantInvite))
+            {
+                await Context.Message.ReplyErrorAsync("I don't have permission to add members in that server.");
+                return;
+            }
+
+            var authorRoles = (Context.Message.Author as SocketGuildUser)?.Roles;
+            var highestRole = authorRoles.MaxBy(role => RoleAllowances.TryGetValue(role.Name.ToLowerInvariant(), out var value) ? value : 0);
+
+            if (highestRole == null || !RoleAllowances.ContainsKey(highestRole.Name.ToLowerInvariant()))
+            {
+                await Context.Message.ReplyErrorAsync("You don't have permission to add users to any guild.");
+                return;
+            }
+
+            var getAllowedAddCount = await _discordAuthService.GetAllowedAddCount(Context.User.Id, highestRole.Name, guild.Id);
+            var numTokens = RoleAllowances[highestRole.Name.ToLowerInvariant()];
+
+            if (getAllowedAddCount != null)
+            {
+                if (getAllowedAddCount <= 0)
+                {
+                    await Context.Message.ReplyErrorAsync("You have reached your daily add limit.");
+                    return;
+                }
+
+                numTokens = Math.Min(numTokens, getAllowedAddCount.Value);
+            }
+
+            var tokens = _bot.Tokens;
+            var privateTokens = await _discordAuthService.GetPrivateStock(Context.User.Id);
+            if (privateTokens != null && privateTokens.Any())
+            {
+                if (await PromptUserConfirmAsync("Would you like to use your private stock?", Context.User.Id))
+                {
+                    tokens = privateTokens;
+                }
+            }
+
+            if (!tokens.Any())
+            {
+                await Context.Message.ReplyErrorAsync("No Stock.");
+                return;
+            }
+
+            var successCount = 0;
+            var eb = new EmbedBuilder()
+                .WithColor(Color.Orange)
+                .WithDescription($"<a:loading:1136512164551741530> Adding {numTokens} online members to the guild '{guild}' for the role '{highestRole.Name}'");
+            var message = await Context.Message.ReplyAsync(embed: eb.Build());
+
+            var usedTokens = new HashSet<string>();
+            var guildUsedTokens = uow.GuildsAdded.Where(x => x.GuildId == guild.Id).Select(x => x.Token).ToHashSet();
+            var availableTokens = new HashSet<string>(tokens.Except(guildUsedTokens));
+
+            foreach (var token in availableTokens)
+            {
+                if (successCount >= numTokens)
+                    break;
+                if (!await _discordAuthService.Authorizer(token, guild.Id.ToString())) continue;
+                successCount += 1;
+                usedTokens.Add(token);
+            }
+
+            if (successCount > 0)
+            {
+                var embed = new EmbedBuilder()
+                    .WithDescription($"✅ Added online members to the guild '{guild}' for the role '{highestRole.Name}' ({successCount}/{numTokens} tokens used).")
+                    .WithColor(Color.Green)
+                    .Build();
+                await message.ModifyAsync(msg => msg.Embed = embed);
+                await uow.GuildsAdded.AddRangeAsync(usedTokens.Select(x => new GuildsAdded { GuildId = guild.Id, Token = x }));
+                await uow.SaveChangesAsync();
+            }
+            else
+            {
+                await Context.Message.ReplyErrorAsync("Failed to add members. No stock left to add to your server.");
+            }
+        }
+        catch (Exception e)
+        {
+            Log.Error("Error adding members: {Error}", e);
+        }
+    }
+
+
+    [Command("stock")]
+    [Summary("Shows the amount of members left in stock")]
+    [Usage("stock")]
+    [IsCommandGuild]
+    public async Task Stock()
+    {
+        var privateOfflineStock = await _discordAuthService.GetPrivateStock(Context.User.Id);
+        var privateOnlineStock = await _discordAuthService.GetPrivateStock(Context.User.Id, true);
+        var nitroStock = _discordAuthService.GetBoostTokens(Context.User.Id);
+        var file = await File.ReadAllLinesAsync("tokens.txt");
+        var onlineFile = await File.ReadAllLinesAsync("onlinetokens.txt");
+        var embed = new EmbedBuilder()
+            .WithColor(Color.Green)
+            .AddField("Regular Stock", $"**Regular Members:** {file.Length}\n**Online Members:** {onlineFile.Length}")
+            .AddField("Private Stock", $"**Regular Members:** {privateOfflineStock?.Count ?? 0}\n**Online Members:** {privateOnlineStock?.Count ?? 0}\n**Boost:** {nitroStock.Count}")
+            .Build();
+
+        await ReplyAsync(embed: embed);
+    }
+
+    [Command("addedmembers")]
+    [Summary("Shows the amount of members added to a guild")]
+    [Usage("addedmembers <guild id>")]
+    [IsCommandGuild]
+    public async Task AddedMembers(ulong guildId)
+    {
+        await using var uow = _db.GetDbContext();
+        var guild = await Context.Client.GetGuildAsync(guildId);
+        if (guild == null)
+        {
+            await ReplyAsync("Guild not found.");
+            return;
+        }
+
+        var addedMembers = uow.GuildsAdded.Count(x => x.GuildId == guild.Id);
+        var embed = new EmbedBuilder()
+            .WithColor(Color.Purple)
+            .WithDescription($"**Added Members:** {addedMembers}")
+            .Build();
+
+        await ReplyAsync(embed: embed);
+    }
+
+    [Command("addstock")]
+    [Summary("Adds members to the stock")]
+    [Usage("addstock <online/offline> <attachment>")]
+    [OwnerOnlyHelp]
+    [IsOwner]
+    public async Task AddStock(StockEnum stockEnum = StockEnum.Offline)
+    {
+        var attachment = Context.Message.Attachments.FirstOrDefault();
+        if (attachment == null)
+        {
+            await Context.Channel.SendErrorAsync("No attachment found.");
+            return;
+        }
+
+        if (attachment.Filename.Split('.').LastOrDefault() != "txt")
+        {
+            await Context.Channel.SendErrorAsync("Invalid file type.");
+            return;
+        }
+
+        var file = await _client.GetStringAsync(attachment.Url);
+        var fileSplit = file.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+
+        foreach (var x in fileSplit)
+        {
+            if (MyRegex().IsMatch(x)) continue;
+            Log.Information(x);
+            await Context.Channel.SendErrorAsync("One or mode invalid members found.");
+            return;
+        }
+
+        switch (stockEnum)
+        {
+            case StockEnum.Online:
+
+                await File.AppendAllLinesAsync("onlinetokens.txt", fileSplit);
+                foreach (var i in fileSplit)
+                {
+                    _bot.OnlineTokens.Add(i);
+                }
+
+                await ReplyAsync($"Added {fileSplit.Length} online members to the stock.");
+                break;
+            case StockEnum.Offline:
+                await File.AppendAllLinesAsync("tokens.txt", fileSplit);
+                foreach (var i in fileSplit)
+                {
+                    _bot.Tokens.Add(i);
+                }
+
+                await ReplyAsync($"Added {fileSplit.Length} offline members to the stock.");
+                break;
+        }
+    }
+
+    [Command("addprivatestock")]
+    [Summary("Adds members to your private stock")]
+    [Usage("addprivatestock <online/offline> <attachment>")]
+    [RateLimit(90)]
+    public async Task AddPrivateStock(StockEnum stockEnum = StockEnum.Offline)
+    {
+        var attachment = Context.Message.Attachments.FirstOrDefault();
+        if (attachment == null)
+        {
+            await Context.Channel.SendErrorAsync("No attachment found.");
+            return;
+        }
+
+        if (attachment.Filename.Split('.').LastOrDefault() != "txt")
+        {
+            await Context.Channel.SendErrorAsync("Invalid file type.");
+            return;
+        }
+
+        var file = await _client.GetStringAsync(attachment.Url);
+        var fileSplit = file.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+
+        foreach (var x in fileSplit)
+        {
+            if (MyRegex().IsMatch(x)) continue;
+            Log.Information(x);
+            await Context.Channel.SendErrorAsync("One or mode invalid members found.");
+            return;
+        }
+
+        switch (stockEnum)
+        {
+            case StockEnum.Online:
+
+                await File.AppendAllLinesAsync("onlinetokens.txt", fileSplit);
+                await _discordAuthService.AddMultiplePrivateStock(Context.User.Id, fileSplit, true);
+                await ReplyAsync($"Added {fileSplit.Length} online members to the stock.");
+                break;
+            case StockEnum.Offline:
+                await File.AppendAllLinesAsync("tokens.txt", fileSplit);
+                foreach (var i in fileSplit)
+                {
+                    _bot.Tokens.Add(i);
+                }
+
+                await ReplyAsync($"Added {fileSplit.Length} offline members to the stock.");
+                break;
+        }
+    }
+
+
+    [Command("djoinmass")]
+    [Summary("Joins a server with the allowed member count for the users highest role, en masse")]
+    [Usage("djoinmass stocktype <guild id> count")]
+    [IsCommandGuild]
+    [RateLimit(30)]
+    [IsMembersChannel]
+    [IsPremium]
+    public async Task MassJoinCommand(StockEnum type, ulong guildId, int count)
+    {
+        try
+        {
+            await using var uow = _db.GetDbContext();
+            var guild = await Context.Client.GetGuildAsync(guildId);
+            if (guild == null)
+            {
+                var inviteUrl = $"https://discord.com/api/oauth2/authorize?client_id={Context.Client.CurrentUser.Id}&permissions=1&scope=bot%20applications.commands";
+                var button = new ComponentBuilder()
+                    .WithButton("Add To Server", style: ButtonStyle.Link, url: inviteUrl);
+                var embed = new EmbedBuilder()
+                    .WithTitle("Error")
+                    .WithDescription($"You need to invite the bot to the server before using this command.")
+                    .WithColor(Color.Red)
+                    .Build();
+                await Context.Message.ReplyAsync(embed: embed, components: button.Build());
+                return;
+            }
+
+            var curUser = await guild.GetUserAsync(Context.Client.CurrentUser.Id);
+            if (!curUser.GuildPermissions.Has(GuildPermission.CreateInstantInvite))
+            {
+                await Context.Message.ReplyErrorAsync("I don't have permission to add members in that server.");
+                return;
+            }
+
+            var authorRoles = (Context.Message.Author as SocketGuildUser)?.Roles;
+            var highestRole = authorRoles.MaxBy(role => RoleAllowances.TryGetValue(role.Name.ToLowerInvariant(), out var value) ? value : 0);
+
+            if (highestRole == null || !RoleAllowances.ContainsKey(highestRole.Name.ToLowerInvariant()))
+            {
+                await Context.Message.ReplyErrorAsync("You don't have permission to add users to any guild.");
+                return;
+            }
+
+            var getAllowedAddCount = await _discordAuthService.GetAllowedAddCount(Context.User.Id, highestRole.Name, guild.Id);
+            if (getAllowedAddCount != null && count > getAllowedAddCount.Value)
+            {
+                await Context.Message.ReplyErrorAsync($"You can only add up to {getAllowedAddCount.Value} members today.");
+                return;
+            }
+
+            HashSet<string> tokens;
+            switch (type)
+            {
+                case StockEnum.Online:
+                    var stock = await _discordAuthService.GetPrivateStock(Context.User.Id);
+                    if (stock is null || !stock.Any())
+                    {
+                        await Context.Message.ReplyErrorAsync("You don't have any members in your private offline stock.");
+                        return;
+                    }
+
+                    tokens = stock;
+                    break;
+
+                case StockEnum.Offline:
+                    var stockonline = await _discordAuthService.GetPrivateStock(Context.User.Id, true);
+                    if (stockonline is null || !stockonline.Any())
+                    {
+                        await Context.Message.ReplyErrorAsync("You don't have any members in your private stock.");
+                        return;
+                    }
+
+                    tokens = stockonline;
+                    break;
+
+                default:
+                    await Context.Channel.SendErrorAsync("How the fuck did you get here?");
+                    return;
+            }
+
+            if (count > tokens.Count)
+            {
+                await Context.Channel.SendErrorAsync("Amount of members to add is more than the amount in stock.");
+                return;
+            }
+
+            if (!tokens.Any())
+            {
+                await Context.Message.ReplyErrorAsync("No Stock.");
+                return;
+            }
+
+            var successCount = 0;
+            var eb = new EmbedBuilder()
+                .WithColor(Color.Orange)
+                .WithDescription($"<a:loading:1136512164551741530> Adding {count} members to the guild '{guild}' for the role '{highestRole.Name}'");
+            var message = await Context.Message.ReplyAsync(embed: eb.Build());
+
+            var usedTokens = new HashSet<string>();
+            var guildUsedTokens = uow.GuildsAdded.Where(x => x.GuildId == guild.Id).Select(x => x.Token).ToHashSet();
+
+            // Create a temporary HashSet that excludes tokens already used in the guild
+            var availableTokens = new HashSet<string>(tokens.Except(guildUsedTokens));
+
+            if (availableTokens.Count < count && !availableTokens.Any())
+            {
+                await Context.Message.ReplyErrorAsync($"Amount of tokens left is less than the amount of members you want to add ({availableTokens.Count}). Adding anyway.");
+            }
+
+            foreach (var token in availableTokens)
+            {
+                if (successCount >= count)
+                    break;
+                if (!await _discordAuthService.Authorizer(token, guild.Id.ToString())) continue;
+                successCount += 1;
+                usedTokens.Add(token);
+            }
+
+            if (successCount > 0)
+            {
+                var embed = new EmbedBuilder()
+                    .WithDescription($"✅ Added the members to the guild '{guild}' for the role '{highestRole.Name}' ({successCount}/{count} tokens used).")
+                    .WithColor(Color.Green)
+                    .Build();
+                await message.ModifyAsync(msg => msg.Embed = embed);
+                await uow.GuildsAdded.AddRangeAsync(usedTokens.Select(x => new GuildsAdded { GuildId = guild.Id, Token = x }));
+                await uow.SaveChangesAsync();
+            }
+            else
+            {
+                await Context.Message.ReplyErrorAsync("Failed to add members. No stock left to add to your server.");
+            }
+        }
+        catch (Exception e)
+        {
+            Log.Error("Error adding members: {Error}", e);
+        }
+    }
+
+    public enum StockEnum
+    {
+        Online,
+        Offline
+    }
+
+    [GeneratedRegex(@"^[a-zA-Z0-9+/=]+\.[a-zA-Z0-9_-]{2,7}\.[a-zA-Z0-9_-]{5,40}$")]
+    private static partial Regex MyRegex();
+}

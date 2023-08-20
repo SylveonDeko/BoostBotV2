@@ -202,4 +202,4 @@
 /.idea/.idea.BoostBotV2/.idea/vcs.xml
 /BoostBotV2/bin/Debug/net7.0/YamlDotNet.dll
 /BoostBotV2/bin/Release/net7.0/YamlDotNet.dll
-/BoostBotV2/creds.yml
+creds.yml

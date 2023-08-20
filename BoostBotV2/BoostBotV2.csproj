@@ -25,9 +25,6 @@
     </ItemGroup>
 
     <ItemGroup>
-        <None Update="creds.yml">
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
         <None Update="tokens.txt">
           <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
@@ -43,6 +40,7 @@
         <None Update="BoostBot.db-wal">
           <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
+        <None Update="creds.yml" />
     </ItemGroup>
 
 </Project>

@@ -50,52 +50,18 @@ public class Rebrand : InteractionModuleBase
                 CommandLogChannel = 0,
                 Owners = modal.Owners.Split(",").Select(x => ulong.Parse(x)).ToList()
             };
-
-            var currentDirectory = Directory.GetCurrentDirectory();
-            string oldPath;
-            if (Environment.OSVersion.Platform == PlatformID.Win32NT)
-                oldPath = Path.GetFullPath("../../../../../BoostBotV2", currentDirectory);
-            else
-                oldPath = Path.GetFullPath("../../BoostBotV2", currentDirectory);
-            var newPath = oldPath.Replace("BoostBotV2", clientId.ToString());
-            CopyDirectory(oldPath, newPath);
-            SerializeYml.Serialize(creds, newPath + "/BoostBotV2/creds.yml");
+            
+            Extensions.ExecuteCommand($"git clone git@github.com:SylveonDeko/BoostBotV2 ~/{clientId}");
+            
+            SerializeYml.Serialize(creds, $"~/{clientId}/BoostBotV2/creds.yml");
+            Extensions.ExecuteCommand($"cp tokens.txt ~/{clientId}/BoostBotV2/");
+            Extensions.ExecuteCommand($"cp onlinetokens.txt ~/{clientId}/BoostBotV2/");
+            Extensions.ExecuteCommand($"cd ~/{clientId}/BoostBotV2 && pm2 start --name {clientId} dotnet run");
             await Context.Interaction.RespondAsync("Rebrand complete.", ephemeral: true);
         }
         catch (Exception e)
         {
             Log.Error("Error rebranding: {e}", e);
-        }
-    }
-
-    private static void CopyDirectory(string sourceDirName, string destDirName)
-    {
-        var dir = new DirectoryInfo(sourceDirName);
-        var dirs = dir.GetDirectories();
-
-        if (!dir.Exists)
-        {
-            throw new DirectoryNotFoundException(
-                "Source directory does not exist or could not be found: "
-                + sourceDirName);
-        }
-
-        if (!Directory.Exists(destDirName))
-        {
-            Directory.CreateDirectory(destDirName);
-        }
-
-        var files = dir.GetFiles();
-        foreach (var file in files)
-        {
-            var tempPath = Path.Combine(destDirName, file.Name);
-            file.CopyTo(tempPath, false);
-        }
-
-        foreach (var subdir in dirs)
-        {
-            var tempPath = Path.Combine(destDirName, subdir.Name);
-            CopyDirectory(subdir.FullName, tempPath);
         }
     }
 }

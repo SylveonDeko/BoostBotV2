@@ -12,6 +12,6 @@ public class IsMembersChannel : PreconditionAttribute
         if (creds.Owners.Contains(context.User.Id))
             return Task.FromResult(PreconditionResult.FromSuccess());
         var service = services.GetRequiredService<Credentials>();
-        return context.Guild.Id != service.CommandGuild ? Task.FromResult(PreconditionResult.FromError("You must be in the command guild to use this command.")) : Task.FromResult(context.Channel.Name.Contains("member-farm") ? PreconditionResult.FromSuccess() : PreconditionResult.FromError("You must be in the member-farm channel to use this command."));
+        return context.Guild.Id != service.CommandGuild ? Task.FromResult(PreconditionResult.FromError("You must be in the command guild to use this command.")) : Task.FromResult(creds.FarmChannel == context.Channel.Id ? PreconditionResult.FromSuccess() : PreconditionResult.FromError("You must be in the member-farm channel to use this command."));
     }
 }

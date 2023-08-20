@@ -25,4 +25,26 @@ public class OwnerOnly : BoostModuleBase
         SerializeYml.Serialize(_creds);
         await ReplyAsync("Log channel set.");
     }
+    
+    [Command("setcommandguild")]
+    [Summary("Sets the command guild.")]
+    [Usage("setcommandguild <guild>")]
+    [IsOwner]
+    public async Task SetCommandGuild(ulong guildId)
+    {
+        _creds.CommandGuild = guildId;
+        SerializeYml.Serialize(_creds);
+        await ReplyAsync("Command guild set.");
+    }
+    
+    [Command("setfarmchannel")]
+    [Summary("Sets the farm channel.")]
+    [Usage("setfarmchannel <channel>")]
+    [IsOwner]
+    public async Task SetFarmChannel(ITextChannel channel)
+    {
+        _creds.FarmChannel = channel.Id;
+        SerializeYml.Serialize(_creds);
+        await ReplyAsync("Farm channel set.");
+    }
 }

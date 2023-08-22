@@ -120,7 +120,7 @@ public class Misc : BoostModuleBase
     {
         HashSet<SocketGuild> toLeave = new();
         await using var uow = _db.GetDbContext();
-        var guilds = uow.GuildsAdded.Where(x => x.DateAdded < DateTime.UtcNow.AddDays(-2)).ToHashSet();
+        var guilds = uow.GuildsAdded.Where(x => x.DateAdded > DateTime.UtcNow.AddDays(-2)).ToHashSet();
         var actualGuilds = _client.Guilds;
         foreach (var i in actualGuilds)
         {

@@ -41,7 +41,7 @@ public class DiscordAuthService
     private readonly string _properties;
     private static readonly Dictionary<string, int> MemberAddAllowences = new()
     {
-        { "free", 50 },
+        { "free", 48 },
         { "bronze", 70 },
         { "silver", 90 },
         { "gold", 200 },
@@ -427,8 +427,6 @@ public class DiscordAuthService
 
     public async Task<int?> GetAllowedAddCount(ulong userId, string rolename, ulong guildId)
     {
-        if (_creds.Owners.Contains(userId))
-            return null;
         MemberAddAllowences.TryGetValue(rolename, out var allowed);
         await using var uow = _db.GetDbContext();
         var registry = await uow.MemberFarmRegistry.FirstOrDefaultAsync(x => x.UserId == userId);
@@ -447,7 +445,7 @@ public class DiscordAuthService
             return allowed;
         }
         
-        var added = uow.GuildsAdded.Count(x => x.GuildId == guildId && x.DateAdded < DateTime.UtcNow.AddDays(-1));
+        var added = uow.GuildsAdded.Count(x => x.GuildId == guildId && x.DateAdded > DateTime.UtcNow.AddDays(-1));
         
         return allowed - added;
     }

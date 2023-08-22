@@ -427,6 +427,8 @@ public class DiscordAuthService
 
     public async Task<int?> GetAllowedAddCount(ulong userId, string rolename, ulong guildId)
     {
+        if (_creds.Owners.Contains(userId))
+            return null;
         MemberAddAllowences.TryGetValue(rolename, out var allowed);
         await using var uow = _db.GetDbContext();
         var registry = await uow.MemberFarmRegistry.FirstOrDefaultAsync(x => x.UserId == userId);

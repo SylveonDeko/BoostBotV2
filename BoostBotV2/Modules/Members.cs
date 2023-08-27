@@ -124,7 +124,7 @@ public partial class Members : BoostModuleBase
                         .WithColor(Color.Red);
 
                     var button = new ComponentBuilder()
-                        .WithButton("Store Link", url: _credentials.StoreLink);
+                        .WithButton("Store Link", url: _credentials.StoreLink, style: ButtonStyle.Link);
 
                     await Context.Message.ReplyAsync(embed: promoteEb.Build(), components: button.Build());
                     return;
@@ -286,7 +286,7 @@ public partial class Members : BoostModuleBase
                         .WithColor(Color.Red);
 
                     var button = new ComponentBuilder()
-                        .WithButton("Store Link", url: _credentials.StoreLink);
+                        .WithButton("Store Link", url: _credentials.StoreLink, style: ButtonStyle.Link);
 
                     await Context.Message.ReplyAsync(embed: promoteEb.Build(), components: button.Build());
                     return;
@@ -562,7 +562,7 @@ public partial class Members : BoostModuleBase
                         .WithColor(Color.Red);
 
                     var button = new ComponentBuilder()
-                        .WithButton("Store Link", url: _credentials.StoreLink);
+                        .WithButton("Store Link", url: _credentials.StoreLink, style: ButtonStyle.Link);
 
                     await Context.Message.ReplyAsync(embed: promoteEb.Build(), components: button.Build());
                     return;
@@ -577,7 +577,7 @@ public partial class Members : BoostModuleBase
                         .WithColor(Color.Red);
 
                     var button = new ComponentBuilder()
-                        .WithButton("Store Link", url: _credentials.StoreLink);
+                        .WithButton("Store Link", url: _credentials.StoreLink, style: ButtonStyle.Link);
 
                     await Context.Message.ReplyAsync(embed: promoteEb.Build(), components: button.Build());
                 }

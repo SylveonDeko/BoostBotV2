@@ -58,18 +58,18 @@ public class BoostModuleBase : ModuleBase
                 {
                     if (c.Channel.Id != channelId || c.Message.Id != msgId || c.User.Id != userId)
                     {
-                        if (!alreadyDeferred) await c.DeferAsync().ConfigureAwait(false);
+                        if (!alreadyDeferred && !arg.HasResponded) await c.DeferAsync().ConfigureAwait(false);
                         return Task.CompletedTask;
                     }
 
                     if (c.Data.CustomId == "yes")
                     {
-                        if (!alreadyDeferred) await c.DeferAsync().ConfigureAwait(false);
+                        if (!alreadyDeferred&& !arg.HasResponded) await c.DeferAsync().ConfigureAwait(false);
                         userInputTask.TrySetResult("Yes");
                         return Task.CompletedTask;
                     }
 
-                    if (!alreadyDeferred) await c.DeferAsync().ConfigureAwait(false);
+                    if (!alreadyDeferred&& !arg.HasResponded) await c.DeferAsync().ConfigureAwait(false);
                     userInputTask.TrySetResult(c.Data.CustomId);
                     return Task.CompletedTask;
                 }).ConfigureAwait(false);

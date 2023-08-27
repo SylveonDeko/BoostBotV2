@@ -10,6 +10,8 @@ public class Credentials
     public ulong ClientId { get; set; }
     public ulong FarmChannel { get; set; }
     public string Prefix { get; set; }
+    public bool RequireAgreement { get; set; }
+    public string StoreLink { get; set; }
     
     public List<ulong> Owners { get; set; }
 }

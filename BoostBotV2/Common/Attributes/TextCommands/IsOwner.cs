@@ -1,5 +1,4 @@
 ﻿using BoostBotV2.Common.Yml;
-using Discord;
 using Discord.Commands;
 using Microsoft.Extensions.DependencyInjection;
 

@@ -1,8 +1,8 @@
 ﻿using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using BoostBotV2.Common;
 using BoostBotV2.Common.Attributes.TextCommands;
+using BoostBotV2.Common.Yml;
 using BoostBotV2.Db;
 using BoostBotV2.Db.Models;
 using BoostBotV2.Services;
@@ -20,6 +20,7 @@ public partial class Members : BoostModuleBase
     private readonly DbService _db;
     private readonly Bot _bot;
     private readonly HttpClient _client;
+    private readonly Credentials _credentials;
 
     private static readonly Dictionary<string, int> RoleAllowances = new()
     {
@@ -30,12 +31,13 @@ public partial class Members : BoostModuleBase
         { "platinum", 35 }
     };
 
-    public Members(DiscordAuthService discordAuthService, DbService db, Bot bot, HttpClient client)
+    public Members(DiscordAuthService discordAuthService, DbService db, Bot bot, HttpClient client, Credentials credentials)
     {
         _discordAuthService = discordAuthService;
         _db = db;
         _bot = bot;
         _client = client;
+        _credentials = credentials;
     }
 
     [Command("djoin")]
@@ -49,6 +51,8 @@ public partial class Members : BoostModuleBase
         try
         {
             await using var uow = _db.GetDbContext();
+            if (!await GetAgreedRules(uow, _credentials))
+                return;
             var registry = await uow.MemberFarmRegistry.FirstOrDefaultAsync(x => x.GuildId == guildId);
 
             if (uow.Blacklists.Select(x => x.BlacklistId).Contains(guildId))
@@ -106,14 +110,23 @@ public partial class Members : BoostModuleBase
                 return;
             }
 
-            var getAllowedAddCount = await _discordAuthService.GetAllowedAddCount(Context.User.Id, highestRole.Name, guild.Id);
+            var (getAllowedAddCount, remainingTime) = await _discordAuthService.GetAllowedAddCount(Context.User.Id, highestRole.Name, guild.Id);
             var numTokens = RoleAllowances[highestRole.Name.ToLowerInvariant()];
 
             if (getAllowedAddCount != null)
             {
                 if (getAllowedAddCount <= 0)
                 {
-                    await Context.Message.ReplyErrorAsync("You have reached your daily add limit.");
+                    var promoteEb = new EmbedBuilder()
+                        .WithTitle("Error")
+                        .WithDescription($"You have reached your daily add limit. Try again at {TimestampTag.FromDateTime(remainingTime.Value)}." +
+                                         $"\nYou can increase the limit by buying plans.")
+                        .WithColor(Color.Red);
+
+                    var button = new ComponentBuilder()
+                        .WithButton("Store Link", url: _credentials.StoreLink);
+
+                    await Context.Message.ReplyAsync(embed: promoteEb.Build(), components: button.Build());
                     return;
                 }
 
@@ -200,6 +213,8 @@ public partial class Members : BoostModuleBase
         try
         {
             await using var uow = _db.GetDbContext();
+            if (!await GetAgreedRules(uow, _credentials))
+                return;
             var registry = await uow.MemberFarmRegistry.FirstOrDefaultAsync(x => x.GuildId == guildId);
 
             if (uow.Blacklists.Select(x => x.BlacklistId).Contains(guildId))
@@ -257,14 +272,23 @@ public partial class Members : BoostModuleBase
                 return;
             }
 
-            var getAllowedAddCount = await _discordAuthService.GetAllowedAddCount(Context.User.Id, highestRole.Name, guild.Id);
+            var (getAllowedAddCount, remainingTime) = await _discordAuthService.GetAllowedAddCount(Context.User.Id, highestRole.Name, guild.Id);
             var numTokens = RoleAllowances[highestRole.Name.ToLowerInvariant()];
 
             if (getAllowedAddCount != null)
             {
                 if (getAllowedAddCount <= 0)
                 {
-                    await Context.Message.ReplyErrorAsync("You have reached your daily add limit.");
+                    var promoteEb = new EmbedBuilder()
+                        .WithTitle("Error")
+                        .WithDescription($"You have reached your daily add limit. Try again at {TimestampTag.FromDateTime(remainingTime.Value)}." +
+                                         $"\nYou can increase the limit by buying plans.")
+                        .WithColor(Color.Red);
+
+                    var button = new ComponentBuilder()
+                        .WithButton("Store Link", url: _credentials.StoreLink);
+
+                    await Context.Message.ReplyAsync(embed: promoteEb.Build(), components: button.Build());
                     return;
                 }
 
@@ -358,6 +382,8 @@ public partial class Members : BoostModuleBase
     public async Task AddedMembers(ulong guildId)
     {
         await using var uow = _db.GetDbContext();
+        if (!await GetAgreedRules(uow, _credentials))
+            return;
         var guild = await Context.Client.GetGuildAsync(guildId);
         if (guild == null)
         {
@@ -435,6 +461,9 @@ public partial class Members : BoostModuleBase
     [RateLimit(90)]
     public async Task AddPrivateStock(StockEnum stockEnum = StockEnum.Offline)
     {
+        await using var uow = _db.GetDbContext();
+        if (!await GetAgreedRules(uow, _credentials))
+            return;
         var attachment = Context.Message.Attachments.FirstOrDefault();
         if (attachment == null)
         {
@@ -488,6 +517,8 @@ public partial class Members : BoostModuleBase
         try
         {
             await using var uow = _db.GetDbContext();
+            if (!await GetAgreedRules(uow, _credentials))
+                return;
             var guild = await Context.Client.GetGuildAsync(guildId);
             if (guild == null)
             {
@@ -519,11 +550,37 @@ public partial class Members : BoostModuleBase
                 return;
             }
 
-            var getAllowedAddCount = await _discordAuthService.GetAllowedAddCount(Context.User.Id, highestRole.Name, guild.Id);
+            var (getAllowedAddCount, remainingTime) = await _discordAuthService.GetAllowedAddCount(Context.User.Id, highestRole.Name, guild.Id);
             if (getAllowedAddCount != null && count > getAllowedAddCount.Value)
             {
-                await Context.Message.ReplyErrorAsync($"You can only add up to {getAllowedAddCount.Value} members today.");
-                return;
+                if (getAllowedAddCount <= 0)
+                {
+                    var promoteEb = new EmbedBuilder()
+                        .WithTitle("Error")
+                        .WithDescription($"You have reached your daily add limit. Try again at {TimestampTag.FromDateTime(remainingTime.Value)}." +
+                                         $"\nYou can increase the limit by buying plans.")
+                        .WithColor(Color.Red);
+
+                    var button = new ComponentBuilder()
+                        .WithButton("Store Link", url: _credentials.StoreLink);
+
+                    await Context.Message.ReplyAsync(embed: promoteEb.Build(), components: button.Build());
+                    return;
+                }
+
+                else
+                {
+                    var promoteEb = new EmbedBuilder()
+                        .WithTitle("Error")
+                        .WithDescription($"You are adding more than your limit allows." +
+                                         $"\nYou can increase the limit by buying plans.")
+                        .WithColor(Color.Red);
+
+                    var button = new ComponentBuilder()
+                        .WithButton("Store Link", url: _credentials.StoreLink);
+
+                    await Context.Message.ReplyAsync(embed: promoteEb.Build(), components: button.Build());
+                }
             }
 
             HashSet<string> tokens;

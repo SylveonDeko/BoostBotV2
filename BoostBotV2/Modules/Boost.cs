@@ -6,7 +6,6 @@ using BoostBotV2.Db.Models;
 using BoostBotV2.Services;
 using Discord;
 using Discord.Commands;
-using Serilog;
 
 namespace BoostBotV2.Modules;
 

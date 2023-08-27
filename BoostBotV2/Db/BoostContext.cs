@@ -32,4 +32,5 @@ public class BoostContext : DbContext
    public DbSet<MemberFarmRegistry> MemberFarmRegistry { get; set; }
    public DbSet<NitroStock> NitroStock { get; set; }
    public DbSet<PrivateStock> PrivateStock { get; set; }
+   public DbSet<RulesAgreed> RulesAgreed { get; set; }
 }

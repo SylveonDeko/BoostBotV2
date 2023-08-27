@@ -5,11 +5,9 @@ using BoostBotV2.Db;
 using BoostBotV2.Db.Models;
 using Discord;
 using Discord.Commands;
-using Discord.Rest;
 using Discord.WebSocket;
 using Fergun.Interactive;
 using Fergun.Interactive.Pagination;
-using Microsoft.VisualBasic;
 
 namespace BoostBotV2.Modules;
 

@@ -1,13 +1,10 @@
 ﻿using System.Collections.Concurrent;
 using System.Net;
-using System.Net.Http.Headers;
-using System.Runtime.CompilerServices;
 using System.Text;
 using BoostBotV2.Common.Yml;
 using BoostBotV2.Db;
 using BoostBotV2.Db.Models;
 using Discord;
-using Discord.Net;
 using Discord.WebSocket;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
@@ -425,13 +422,16 @@ public class DiscordAuthService
         }
     }
 
-    public async Task<int?> GetAllowedAddCount(ulong userId, string rolename, ulong guildId)
+    public async Task<(int? RemainingCount, DateTime? remainingTime)> GetAllowedAddCount(ulong userId, string rolename, ulong guildId)
     {
         if (_creds.Owners.Contains(userId))
-            return null;
+            return (null, null);
+
         MemberAddAllowences.TryGetValue(rolename, out var allowed);
+
         await using var uow = _db.GetDbContext();
         var registry = await uow.MemberFarmRegistry.FirstOrDefaultAsync(x => x.UserId == userId);
+    
         if (registry == null)
         {
             await uow.MemberFarmRegistry.AddAsync(new MemberFarmRegistry
@@ -442,15 +442,23 @@ public class DiscordAuthService
             await uow.SaveChangesAsync();
         }
 
-        if (registry is null)
+        var added = await uow.GuildsAdded.CountAsync(x => x.GuildId == guildId && x.DateAdded > DateTime.UtcNow.AddDays(-1));
+        var remaining = allowed - added;
+
+        if (remaining > 0)
         {
-            return allowed;
+            return (remaining, null);
         }
-        
-        var added = uow.GuildsAdded.Count(x => x.GuildId == guildId && x.DateAdded > DateTime.UtcNow.AddDays(-1));
-        
-        return allowed - added;
+
+        var lastAddedTime = await uow.GuildsAdded
+            .Where(x => x.GuildId == guildId)
+            .OrderByDescending(x => x.DateAdded)
+            .Select(x => x.DateAdded)
+            .FirstOrDefaultAsync();
+
+        return (0, lastAddedTime.AddDays(1));
     }
+
 
     public class LocationModel
     {

@@ -1,5 +1,4 @@
-﻿using System.Collections.Immutable;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Reflection;
 using BoostBotV2.Common.Yml;
 using BoostBotV2.Db;

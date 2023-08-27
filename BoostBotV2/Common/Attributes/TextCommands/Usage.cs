@@ -1,6 +1,4 @@
-﻿using Discord.Commands;
-
-namespace BoostBotV2.Common.Attributes.TextCommands;
+﻿namespace BoostBotV2.Common.Attributes.TextCommands;
 
 public class Usage : Attribute
 {

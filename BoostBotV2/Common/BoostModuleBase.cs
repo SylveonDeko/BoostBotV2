@@ -81,6 +81,13 @@ public class BoostModuleBase : ModuleBase
     {
         if (!creds.RequireAgreement)
             return true;
+
+        var attempts = context.RuleAttempts.Count(x => x.UserId == Context.User.Id && x.DateAdded > DateTime.UtcNow.AddMinutes(5));
+        if (attempts >= 3)
+        {
+            await Context.Channel.SendErrorAsync("Too many attempts. Try again later.").ConfigureAwait(false);
+            return false;
+        }
         
         var agreed = await context.RulesAgreed.AnyAsync(x => x.UserId == Context.User.Id).ConfigureAwait(false);
         if (agreed)
@@ -144,6 +151,8 @@ public class BoostModuleBase : ModuleBase
         }
 
         await msg.DeleteAsync();
+        await context.RuleAttempts.AddAsync(new RuleAttempts {UserId = Context.User.Id});
+        await context.SaveChangesAsync();
         await Context.Channel.SendErrorAsync("You failed the skim check. You have to agree to the rules to use the bot.");
         return false;
     }

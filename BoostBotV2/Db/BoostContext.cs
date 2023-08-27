@@ -30,6 +30,7 @@ public class BoostContext : DbContext
    public DbSet<Blacklists> Blacklists { get; set; }
    public DbSet<Keys> Keys { get; set; }
    public DbSet<MemberFarmRegistry> MemberFarmRegistry { get; set; }
+   public DbSet<RuleAttempts> RuleAttempts { get; set; }
    public DbSet<NitroStock> NitroStock { get; set; }
    public DbSet<PrivateStock> PrivateStock { get; set; }
    public DbSet<RulesAgreed> RulesAgreed { get; set; }

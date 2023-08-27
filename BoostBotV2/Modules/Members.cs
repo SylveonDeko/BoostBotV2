@@ -153,7 +153,8 @@ public partial class Members : BoostModuleBase
             var usedTokens = new HashSet<string>();
             var guildUsedTokens = uow.GuildsAdded.Where(x => x.GuildId == guild.Id).Select(x => x.Token).ToHashSet();
             var availableTokens = new HashSet<string>(tokens.Except(guildUsedTokens));
-
+            var sw = new Stopwatch();
+            sw.Start();
             foreach (var token in availableTokens)
             {
                 if (successCount >= numTokens)
@@ -162,11 +163,13 @@ public partial class Members : BoostModuleBase
                 successCount += 1;
                 usedTokens.Add(token);
             }
+            sw.Stop();
 
             if (successCount > 0)
             {
                 var embed = new EmbedBuilder()
                     .WithDescription($"✅ Added members to the guild '{guild}' for the role '{highestRole.Name}' ({successCount}/{numTokens} tokens used).")
+                    .WithFooter($"Took {sw.Elapsed:g} to add {successCount} members to {guild}")
                     .WithColor(Color.Green)
                     .Build();
                 await message.ModifyAsync(msg => msg.Embed = embed);

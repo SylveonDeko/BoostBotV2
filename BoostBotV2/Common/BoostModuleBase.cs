@@ -10,14 +10,22 @@ namespace BoostBotV2.Common;
 
 public class BoostModuleBase : ModuleBase
 {
-    public async Task<bool> PromptUserConfirmAsync(string message, ulong userid)
-        => await PromptUserConfirmAsync(new EmbedBuilder().WithColor(Color.Green).WithDescription(message), userid).ConfigureAwait(false);
+    public async Task<bool> PromptUserConfirmAsync(string message, ulong userid, bool reply = false)
+        => await PromptUserConfirmAsync(new EmbedBuilder().WithColor(Color.Green).WithDescription(message), userid, reply).ConfigureAwait(false);
 
-    public async Task<bool> PromptUserConfirmAsync(EmbedBuilder embed, ulong userid)
+    public async Task<bool> PromptUserConfirmAsync(EmbedBuilder embed, ulong userid, bool reply = false)
     {
         embed.WithColor(Color.Green);
         var buttons = new ComponentBuilder().WithButton("Yes", "yes", ButtonStyle.Success).WithButton("No", "no", ButtonStyle.Danger);
-        var msg = await Context.Channel.SendMessageAsync(embed: embed.Build(), components: buttons.Build()).ConfigureAwait(false);
+        IUserMessage msg;
+        if (reply)
+        {
+            msg = await Context.Message.ReplyAsync(embed: embed.Build(), components: buttons.Build()).ConfigureAwait(false);
+        }
+        else
+        {
+            msg = await Context.Channel.SendMessageAsync(embed: embed.Build(), components: buttons.Build()).ConfigureAwait(false);
+        }
         try
         {
             var input = await GetButtonInputAsync(msg.Channel.Id, msg.Id, userid).ConfigureAwait(false);
@@ -106,7 +114,7 @@ public class BoostModuleBase : ModuleBase
                              "\n8. No alts unless your other account got termed. None. Zero. Zilch.")
             .WithFooter("If you are caught picking for someone else you will be timed out and so will they.");
 
-        if (!await PromptUserConfirmAsync(eb, Context.User.Id).ConfigureAwait(false)) return false;
+        if (!await PromptUserConfirmAsync(eb, Context.User.Id, true).ConfigureAwait(false)) return false;
         var eb2 = new EmbedBuilder()
             .WithColor(Color.Red)
             .WithTitle("Skim Check")
@@ -139,7 +147,7 @@ public class BoostModuleBase : ModuleBase
         {
             componentBuilder.WithButton(key, buttonRules[key]);
         }
-        var msg = await Context.Channel.SendMessageAsync(embed: eb2.Build(), components: componentBuilder.Build());
+        var msg = await Context.Message.ReplyAsync(embed: eb2.Build(), components: componentBuilder.Build());
         var button = await GetButtonInputAsync(Context.Channel.Id, msg.Id, Context.User.Id);
         if (button == "rule6")
         {

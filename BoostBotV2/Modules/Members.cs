@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using BoostBotV2.Common;
 using BoostBotV2.Common.Attributes.TextCommands;
@@ -292,7 +293,8 @@ public partial class Members : BoostModuleBase
             var usedTokens = new HashSet<string>();
             var guildUsedTokens = uow.GuildsAdded.Where(x => x.GuildId == guild.Id).Select(x => x.Token).ToHashSet();
             var availableTokens = new HashSet<string>(tokens.Except(guildUsedTokens));
-
+            var sw = new Stopwatch();
+            sw.Start();
             foreach (var token in availableTokens)
             {
                 if (successCount >= numTokens)
@@ -301,11 +303,13 @@ public partial class Members : BoostModuleBase
                 successCount += 1;
                 usedTokens.Add(token);
             }
+            sw.Stop();
 
             if (successCount > 0)
             {
                 var embed = new EmbedBuilder()
                     .WithDescription($"✅ Added online members to the guild '{guild}' for the role '{highestRole.Name}' ({successCount}/{numTokens} tokens used).")
+                    .WithFooter($"Took {sw.Elapsed:g} to add {successCount} members.")
                     .WithColor(Color.Green)
                     .Build();
                 await message.ModifyAsync(msg => msg.Embed = embed);
@@ -578,6 +582,9 @@ public partial class Members : BoostModuleBase
                 await Context.Message.ReplyErrorAsync($"Amount of tokens left is less than the amount of members you want to add ({availableTokens.Count}). Adding anyway.");
             }
 
+            var sw = new Stopwatch();
+            sw.Start();
+
             foreach (var token in availableTokens)
             {
                 if (successCount >= count)
@@ -586,11 +593,13 @@ public partial class Members : BoostModuleBase
                 successCount += 1;
                 usedTokens.Add(token);
             }
+            sw.Stop();
 
             if (successCount > 0)
             {
                 var embed = new EmbedBuilder()
                     .WithDescription($"✅ Added the members to the guild '{guild}' for the role '{highestRole.Name}' ({successCount}/{count} tokens used).")
+                    .WithFooter($"Took {sw.Elapsed:g} to add {successCount} members to {guild.Name}")
                     .WithColor(Color.Green)
                     .Build();
                 await message.ModifyAsync(msg => msg.Embed = embed);

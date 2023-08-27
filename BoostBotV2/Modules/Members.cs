@@ -458,16 +458,12 @@ public partial class Members : BoostModuleBase
 
                 await File.AppendAllLinesAsync("onlinetokens.txt", fileSplit);
                 await _discordAuthService.AddMultiplePrivateStock(Context.User.Id, fileSplit, true);
-                await ReplyAsync($"Added {fileSplit.Length} online members to the stock.");
+                await ReplyAsync($"Added {fileSplit.Length} online members to your private stock.");
                 break;
             case StockEnum.Offline:
                 await File.AppendAllLinesAsync("tokens.txt", fileSplit);
-                foreach (var i in fileSplit)
-                {
-                    _bot.Tokens.Add(i);
-                }
-
-                await ReplyAsync($"Added {fileSplit.Length} offline members to the stock.");
+                await _discordAuthService.AddMultiplePrivateStock(Context.User.Id, fileSplit);
+                await ReplyAsync($"Added {fileSplit.Length} offline members to your private stock.");
                 break;
         }
     }

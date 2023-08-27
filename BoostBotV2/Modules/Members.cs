@@ -523,7 +523,7 @@ public partial class Members : BoostModuleBase
             switch (type)
             {
                 case StockEnum.Online:
-                    var stock = await _discordAuthService.GetPrivateStock(Context.User.Id);
+                    var stock = await _discordAuthService.GetPrivateStock(Context.User.Id, true);
                     if (stock is null || !stock.Any())
                     {
                         await Context.Message.ReplyErrorAsync("You don't have any members in your private offline stock.");
@@ -534,7 +534,7 @@ public partial class Members : BoostModuleBase
                     break;
 
                 case StockEnum.Offline:
-                    var stockonline = await _discordAuthService.GetPrivateStock(Context.User.Id, true);
+                    var stockonline = await _discordAuthService.GetPrivateStock(Context.User.Id);
                     if (stockonline is null || !stockonline.Any())
                     {
                         await Context.Message.ReplyErrorAsync("You don't have any members in your private stock.");

@@ -96,7 +96,8 @@ public class BoostModuleBase : ModuleBase
                              "\n5. Staff don't have to be nice, don't act entitled." +
                              "\n6. Don't beg for members/restocks/anything member related" +
                              "\n7. Don't be a dick" +
-                             "\n8. No alts unless your other account got termed. None. Zero. Zilch.");
+                             "\n8. No alts unless your other account got termed. None. Zero. Zilch.")
+            .WithFooter("If you are caught picking for someone else you will be timed out and so will they.");
 
         if (!await PromptUserConfirmAsync(eb, Context.User.Id).ConfigureAwait(false)) return false;
         var eb2 = new EmbedBuilder()

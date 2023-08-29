@@ -216,7 +216,7 @@ public class DiscordAuthService
         return true;
     }
 
-    public async Task<bool> Authorizer(string token, string guild)
+    public async Task<bool> Authorizer(string token, string guild, bool isPrivate = false)
     {
         try
         {
@@ -230,7 +230,8 @@ public class DiscordAuthService
             catch (Exception e)
             {
                 Log.Error("Failed to create request: {Message}", e.Message);
-                _tokensToRemove.Enqueue(token);
+                if (!isPrivate)
+                    _tokensToRemove.Enqueue(token);
                 return false;
             }
             var response = await _client.SendAsync(request);
@@ -238,7 +239,8 @@ public class DiscordAuthService
             if (!response.IsSuccessStatusCode)
             {
                 if (response.StatusCode is not (HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden or HttpStatusCode.BadRequest)) return false;
-                _tokensToRemove.Enqueue(token);
+                if (!isPrivate)
+                    _tokensToRemove.Enqueue(token);
                 return false;
             }
 
@@ -248,7 +250,8 @@ public class DiscordAuthService
             var exchange = await ExchangeCode(code.Split("code=")[1].Split("&")[0]);
             if (exchange == null)
             {
-                _tokensToRemove.Enqueue(token);
+                if (!isPrivate)
+                    _tokensToRemove.Enqueue(token);
                 return false;
             }
 
@@ -361,6 +364,41 @@ public class DiscordAuthService
         await uow.SaveChangesAsync();
     }
 
+    public async Task RemovePrivateToken(string token, ulong userId, bool isOnline = false)
+    {
+        switch (isOnline)
+        {
+            case true when _privateonlinestock.ContainsKey(userId):
+            {
+                var stock = _privateonlinestock[userId];
+                if (!stock.Contains(token))
+                    return;
+                stock.Remove(token);
+                await using var uow = _db.GetDbContext();
+                var toRemove = await uow.PrivateStock.FirstOrDefaultAsync(x => x.Token == token && x.UserId == userId);
+                if (toRemove is null)
+                    return;
+                uow.PrivateStock.Remove(toRemove);
+                await uow.SaveChangesAsync();
+                break;
+            }
+            case false when _privateofflinestock.ContainsKey(userId):
+            {
+                var stock = _privateofflinestock[userId];
+                if (!stock.Contains(token))
+                    return;
+                stock.Remove(token);
+                await using var uow = _db.GetDbContext();
+                var toRemove = await uow.PrivateStock.FirstOrDefaultAsync(x => x.Token == token && x.UserId == userId);
+                if (toRemove is null)
+                    return;
+                uow.PrivateStock.Remove(toRemove);
+                await uow.SaveChangesAsync();
+                break;
+            }
+        }
+    }
+
     public async Task AddMultiplePrivateStock(ulong userId, IEnumerable<string> tokens, bool isOnline = false)
     {
         if (isOnline)
@@ -414,12 +452,10 @@ public class DiscordAuthService
                 _privateonlinestock[userId] = new HashSet<string>();
             return _privateonlinestock[userId];
         }
-        else
-        {
-            if (!_privateofflinestock.ContainsKey(userId))
-                _privateofflinestock[userId] = new HashSet<string>();
-            return _privateofflinestock[userId];
-        }
+
+        if (!_privateofflinestock.ContainsKey(userId))
+            _privateofflinestock[userId] = new HashSet<string>();
+        return _privateofflinestock[userId];
     }
 
     public async Task<(int? RemainingCount, DateTime? remainingTime)> GetAllowedAddCount(ulong userId, string rolename, ulong guildId)

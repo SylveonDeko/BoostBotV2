@@ -51,6 +51,7 @@ public partial class Members : BoostModuleBase
         try
         {
             await using var uow = _db.GetDbContext();
+            var privatestock = false;
             if (!await GetAgreedRules(uow, _credentials))
                 return;
             var registry = await uow.MemberFarmRegistry.FirstOrDefaultAsync(x => x.GuildId == guildId);
@@ -82,7 +83,7 @@ public partial class Members : BoostModuleBase
             var guild = await Context.Client.GetGuildAsync(guildId);
             if (guild == null)
             {
-                var inviteUrl = $"https://discord.com/api/oauth2/authorize?client_id={Context.Client.CurrentUser.Id}&permissions=1&scope=bot%20applications.commands";
+                var inviteUrl = $"https://discord.com/api/oauth2/authorize?client_id={Context.Client.CurrentUser.Id}&permissions=1&scope=bot%20applications.commands?guild_id={guildId}";
                 var button = new ComponentBuilder()
                     .WithButton("Add To Server", style: ButtonStyle.Link, url: inviteUrl);
                 var embed = new EmbedBuilder()
@@ -140,6 +141,7 @@ public partial class Members : BoostModuleBase
                 if (await PromptUserConfirmAsync("Would you like to use your private stock?", Context.User.Id))
                 {
                     tokens = privateTokens;
+                    privatestock = true;
                 }
             }
 
@@ -172,7 +174,14 @@ public partial class Members : BoostModuleBase
             {
                 if (successCount >= numTokens)
                     break;
-                if (!await _discordAuthService.Authorizer(token, guild.Id.ToString())) continue;
+                if (!await _discordAuthService.Authorizer(token, guild.Id.ToString()))
+                {
+                    if (privatestock)
+                    {
+                        await _discordAuthService.RemovePrivateToken(token, Context.User.Id);
+                    }
+                    continue;
+                }
                 successCount += 1;
                 usedTokens.Add(token);
             }
@@ -244,7 +253,7 @@ public partial class Members : BoostModuleBase
             var guild = await Context.Client.GetGuildAsync(guildId);
             if (guild == null)
             {
-                var inviteUrl = $"https://discord.com/api/oauth2/authorize?client_id={Context.Client.CurrentUser.Id}&permissions=1&scope=bot%20applications.commands";
+                var inviteUrl = $"https://discord.com/api/oauth2/authorize?client_id={Context.Client.CurrentUser.Id}&permissions=1&scope=bot%20applications.commands?guild_id={guildId}";
                 var button = new ComponentBuilder()
                     .WithButton("Add To Server", style: ButtonStyle.Link, url: inviteUrl);
                 var embed = new EmbedBuilder()
@@ -297,11 +306,13 @@ public partial class Members : BoostModuleBase
 
             var tokens = _bot.Tokens;
             var privateTokens = await _discordAuthService.GetPrivateStock(Context.User.Id);
+            var privateStock = false;
             if (privateTokens != null && privateTokens.Any())
             {
                 if (await PromptUserConfirmAsync("Would you like to use your private stock?", Context.User.Id))
                 {
                     tokens = privateTokens;
+                    privateStock = true;
                 }
             }
 
@@ -312,6 +323,7 @@ public partial class Members : BoostModuleBase
             }
 
             var successCount = 0;
+            var failedCount = 0;
             var eb = new EmbedBuilder()
                 .WithColor(Color.Orange)
                 .WithDescription($"<a:loading:1136512164551741530> Adding {numTokens} online members to the guild '{guild}' for the role '{highestRole.Name}'");
@@ -326,7 +338,14 @@ public partial class Members : BoostModuleBase
             {
                 if (successCount >= numTokens)
                     break;
-                if (!await _discordAuthService.Authorizer(token, guild.Id.ToString())) continue;
+                if (!await _discordAuthService.Authorizer(token, guild.Id.ToString()))
+                {
+                    if (privateStock)
+                    {
+                        await _discordAuthService.RemovePrivateToken(token, Context.User.Id);
+                    }
+                    continue;
+                }
                 successCount += 1;
                 usedTokens.Add(token);
             }
@@ -335,8 +354,8 @@ public partial class Members : BoostModuleBase
             if (successCount > 0)
             {
                 var embed = new EmbedBuilder()
-                    .WithDescription($"✅ Added online members to the guild '{guild}' for the role '{highestRole.Name}' ({successCount}/{numTokens} tokens used).")
-                    .WithFooter($"Took {sw.Elapsed:g} to add {successCount} members.")
+                    .WithDescription($"✅ Added online members to the guild '{guild}' for the role '{highestRole.Name}' ({successCount}/{numTokens} members used).")
+                    .WithFooter($"Took {sw.Elapsed:g} to add {successCount} members. Removed {failedCount} non working members.")
                     .WithColor(Color.Green)
                     .Build();
                 await message.ModifyAsync(msg => msg.Embed = embed);
@@ -522,7 +541,7 @@ public partial class Members : BoostModuleBase
             var guild = await Context.Client.GetGuildAsync(guildId);
             if (guild == null)
             {
-                var inviteUrl = $"https://discord.com/api/oauth2/authorize?client_id={Context.Client.CurrentUser.Id}&permissions=1&scope=bot%20applications.commands";
+                var inviteUrl = $"https://discord.com/api/oauth2/authorize?client_id={Context.Client.CurrentUser.Id}&permissions=1&scope=bot%20applications.commands?guild_id={guildId}";
                 var button = new ComponentBuilder()
                     .WithButton("Add To Server", style: ButtonStyle.Link, url: inviteUrl);
                 var embed = new EmbedBuilder()
@@ -626,6 +645,7 @@ public partial class Members : BoostModuleBase
             }
 
             var successCount = 0;
+            var failedCount = 0;
             var eb = new EmbedBuilder()
                 .WithColor(Color.Orange)
                 .WithDescription($"<a:loading:1136512164551741530> Adding {count} members to the guild '{guild}' for the role '{highestRole.Name}'");
@@ -649,7 +669,11 @@ public partial class Members : BoostModuleBase
             {
                 if (successCount >= count)
                     break;
-                if (!await _discordAuthService.Authorizer(token, guild.Id.ToString())) continue;
+                if (!await _discordAuthService.Authorizer(token, guild.Id.ToString()))
+                {
+                    await _discordAuthService.RemovePrivateToken(token, Context.User.Id, type == StockEnum.Online);
+                    continue;
+                }
                 successCount += 1;
                 usedTokens.Add(token);
             }
@@ -658,8 +682,8 @@ public partial class Members : BoostModuleBase
             if (successCount > 0)
             {
                 var embed = new EmbedBuilder()
-                    .WithDescription($"✅ Added the members to the guild '{guild}' for the role '{highestRole.Name}' ({successCount}/{count} tokens used).")
-                    .WithFooter($"Took {sw.Elapsed:g} to add {successCount} members to {guild.Name}")
+                    .WithDescription($"✅ Added the members to the guild '{guild}' for the role '{highestRole.Name}' ({successCount}/{count} members used).")
+                    .WithFooter($"Took {sw.Elapsed:g} to add {successCount} members. Removed {failedCount} non working members.")
                     .WithColor(Color.Green)
                     .Build();
                 await message.ModifyAsync(msg => msg.Embed = embed);

@@ -305,8 +305,8 @@ public partial class Members : BoostModuleBase
                 numTokens = Math.Min(numTokens, getAllowedAddCount.Value);
             }
 
-            var tokens = _bot.Tokens;
-            var privateTokens = await _discordAuthService.GetPrivateStock(Context.User.Id);
+            var tokens = _bot.OnlineTokens;
+            var privateTokens = await _discordAuthService.GetPrivateStock(Context.User.Id, true);
             var privateStock = false;
             if (privateTokens != null && privateTokens.Any())
             {

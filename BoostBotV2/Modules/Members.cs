@@ -83,7 +83,7 @@ public partial class Members : BoostModuleBase
             var guild = await Context.Client.GetGuildAsync(guildId);
             if (guild == null)
             {
-                var inviteUrl = $"https://discord.com/api/oauth2/authorize?client_id={Context.Client.CurrentUser.Id}&permissions=1&scope=bot%20applications.commands?guild_id={guildId}";
+                var inviteUrl = $"https://discord.com/api/oauth2/authorize?client_id={Context.Client.CurrentUser.Id}&permissions=1&scope=bot%20applications.commands&guild_id={guildId}";
                 var button = new ComponentBuilder()
                     .WithButton("Add To Server", style: ButtonStyle.Link, url: inviteUrl);
                 var embed = new EmbedBuilder()
@@ -253,7 +253,7 @@ public partial class Members : BoostModuleBase
             var guild = await Context.Client.GetGuildAsync(guildId);
             if (guild == null)
             {
-                var inviteUrl = $"https://discord.com/api/oauth2/authorize?client_id={Context.Client.CurrentUser.Id}&permissions=1&scope=bot%20applications.commands?guild_id={guildId}";
+                var inviteUrl = $"https://discord.com/api/oauth2/authorize?client_id={Context.Client.CurrentUser.Id}&permissions=1&scope=bot%20applications.commands&guild_id={guildId}";
                 var button = new ComponentBuilder()
                     .WithButton("Add To Server", style: ButtonStyle.Link, url: inviteUrl);
                 var embed = new EmbedBuilder()
@@ -541,7 +541,7 @@ public partial class Members : BoostModuleBase
             var guild = await Context.Client.GetGuildAsync(guildId);
             if (guild == null)
             {
-                var inviteUrl = $"https://discord.com/api/oauth2/authorize?client_id={Context.Client.CurrentUser.Id}&permissions=1&scope=bot%20applications.commands?guild_id={guildId}";
+                var inviteUrl = $"https://discord.com/api/oauth2/authorize?client_id={Context.Client.CurrentUser.Id}&permissions=1&scope=bot%20applications.commands&guild_id={guildId}";
                 var button = new ComponentBuilder()
                     .WithButton("Add To Server", style: ButtonStyle.Link, url: inviteUrl);
                 var embed = new EmbedBuilder()

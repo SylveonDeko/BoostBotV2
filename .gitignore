@@ -12,3 +12,17 @@
 /BoostBotV2.Api/*.db
 /BoostBotV2.Api/*.db-*
 /BoostBotV2.Api/*.zip
+*.json
+*.db
+*.db-shm
+*.db-wal
+*.dll
+*.exe
+*.so
+*.dylib
+*.txt
+*.cache
+*.props
+*.g.cs
+*.info
+*.zip

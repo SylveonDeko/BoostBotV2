@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net7.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="Discord.Net.Core" Version="3.12.0" />
+      <PackageReference Include="Discord.Net.Webhook" Version="3.12.0" />
+      <PackageReference Include="Figgle" Version="0.5.1" />
+      <PackageReference Include="StackExchange.Redis" Version="2.6.122" />
+      <PackageReference Include="Swashbuckle.AspNetCore" Version="6.5.0" />
+      <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="6.5.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\BoostBotV2\BoostBotV2.csproj" />
+    </ItemGroup>
+
+</Project>

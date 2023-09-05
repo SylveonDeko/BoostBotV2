@@ -6,6 +6,7 @@ using BoostBotV2.Db;
 using BoostBotV2.Db.Models;
 using Discord;
 using Discord.WebSocket;
+using Mewdeko.Common.PubSub;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using Serilog;
@@ -42,10 +43,11 @@ public class DiscordAuthService
         { "bronze", 70 },
         { "silver", 90 },
         { "gold", 200 },
-        { "platinum", 500 }
+        { "platinum", 500 },
+        { "premium", 1000 }
     };
 
-    public DiscordAuthService(Credentials creds, HttpClient client, DiscordSocketClient discord, Bot bot, DbService db)
+    public DiscordAuthService(Credentials creds, HttpClient client, DiscordSocketClient discord, Bot bot, DbService db, IPubSub sub)
     {
         _creds = creds;
         _client = client;
@@ -57,6 +59,7 @@ public class DiscordAuthService
         _redirect = "http://localhost:8080";
         _apiEndpoint = "https://canary.discord.com/api/v9";
         _auth = $"https://canary.discord.com/api/oauth2/authorize?client_id={_clientId}&redirect_uri={_redirect}&response_type=code&scope=identify%20guilds.join";
+        sub.Sub<string>($"{creds.BotToken[..10]}_test", TestSub);
 
         var properties = new
         {
@@ -90,6 +93,12 @@ public class DiscordAuthService
             .GroupBy(x => x.UserId)
             .ToDictionary(x => x.Key, x => x.Where(z => z.IsOnline)
                 .Select(y => y.Token).ToHashSet()));
+    }
+
+    private ValueTask TestSub(string arg)
+    {
+        Log.Information(arg);
+        return ValueTask.CompletedTask;
     }
 
     public async Task ProcessRemovals()

@@ -5,6 +5,8 @@ VisualStudioVersion = 17.6.33829.357
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BoostBotV2", "BoostBotV2\BoostBotV2.csproj", "{9F07DF34-7913-4DC9-A98E-8FB3D9358D54}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BoostBotV2.Api", "BoostBotV2.Api\BoostBotV2.Api.csproj", "{04F1581F-B8BE-42A2-91E9-0F7E6AD3FC2C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{9F07DF34-7913-4DC9-A98E-8FB3D9358D54}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9F07DF34-7913-4DC9-A98E-8FB3D9358D54}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9F07DF34-7913-4DC9-A98E-8FB3D9358D54}.Release|Any CPU.Build.0 = Release|Any CPU
+		{04F1581F-B8BE-42A2-91E9-0F7E6AD3FC2C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{04F1581F-B8BE-42A2-91E9-0F7E6AD3FC2C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{04F1581F-B8BE-42A2-91E9-0F7E6AD3FC2C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{04F1581F-B8BE-42A2-91E9-0F7E6AD3FC2C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

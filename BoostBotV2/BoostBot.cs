@@ -1,15 +1,18 @@
 ﻿using System.Diagnostics;
 using System.Reflection;
+using BoostBotV2.Common.PubSub;
 using BoostBotV2.Common.Yml;
 using BoostBotV2.Db;
 using BoostBotV2.Db.Models;
 using BoostBotV2.Services;
+using BoostBotV2.Services.Impl;
 using Discord;
 using Discord.Commands;
 using Discord.Interactions;
 using Discord.Rest;
 using Discord.WebSocket;
 using Fergun.Interactive;
+using Mewdeko.Common.PubSub;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
 
@@ -50,6 +53,7 @@ namespace BoostBotV2
 
         private async Task AddServices()
         {
+            var cache = new BotDataCache();
             var sw = Stopwatch.StartNew();
             var s = new ServiceCollection()
                 .AddSingleton(_db)
@@ -57,7 +61,11 @@ namespace BoostBotV2
                 .AddSingleton(this)
                 .AddSingleton(Credentials)
                 .AddSingleton(_commands)
+                .AddSingleton(cache)
+                .AddSingleton(cache.Redis)
+                .AddTransient<ISeria, JsonSeria>()
                 .AddSingleton<DiscordAuthService>()
+                .AddTransient<IPubSub, RedisPubSub>()
                 .AddSingleton<InteractionService>()
                 .AddSingleton<InteractiveService>();
             s.AddHttpClient<DiscordAuthService>();
@@ -167,6 +175,23 @@ namespace BoostBotV2
             {
                 Log.Error("Command Guild not specified, cannot start");
                 Environment.Exit(1);
+            }
+            if (File.Exists("tokens.txt"))
+            {
+                Tokens = (await File.ReadAllLinesAsync("tokens.txt")).ToHashSet();
+            }
+            else
+            {
+                File.Create("tokens.txt");
+            }
+            
+            if (File.Exists("onlinetokens.txt"))
+            {
+                OnlineTokens = (await File.ReadAllLinesAsync("onlinetokens.txt")).ToHashSet();
+            }
+            else
+            {
+                File.Create("onlinetokens.txt");
             }
 
             await LoginAsync(Credentials.BotToken).ConfigureAwait(false);

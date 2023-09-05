@@ -1,6 +1,7 @@
 ﻿using BoostBotV2.Common;
 using BoostBotV2.Common.Attributes.TextCommands;
 using BoostBotV2.Common.Yml;
+using BoostBotV2.Db;
 using Discord;
 using Discord.Commands;
 
@@ -9,10 +10,12 @@ namespace BoostBotV2.Modules;
 public class OwnerOnly : BoostModuleBase
 {
     private readonly Credentials _creds;
+    private readonly DbService _db;
 
-    public OwnerOnly(Credentials creds)
+    public OwnerOnly(Credentials creds, DbService db)
     {
         _creds = creds;
+        _db = db;
     }
 
     [Command("setlogchannel")]
@@ -46,5 +49,22 @@ public class OwnerOnly : BoostModuleBase
         _creds.FarmChannel = channel.Id;
         SerializeYml.Serialize(_creds);
         await ReplyAsync("Farm channel set.");
+    }
+
+    [Command("resetrules")]
+    [Summary("Resets rules selection for a user")]
+    [Usage("resetrules userid")]
+    public async Task ResetRules(ulong userId)
+    {
+        await using var uow = _db.GetDbContext();
+        var exists = uow.RulesAgreed.FirstOrDefault(x => x.UserId == userId);
+        if (exists is not null)
+        {
+            if (await PromptUserConfirmAsync("Are you sure you want to reset rules for this user?", Context.User.Id))
+            {
+                uow.RulesAgreed.Remove(exists);
+                await uow.SaveChangesAsync();
+            }
+        }
     }
 }

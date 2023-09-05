@@ -28,7 +28,8 @@ public partial class Members : BoostModuleBase
         { "bronze", 5 },
         { "silver", 10 },
         { "gold", 20 },
-        { "platinum", 35 }
+        { "platinum", 35 },
+        { "premium", 50}
     };
 
     public Members(DiscordAuthService discordAuthService, DbService db, Bot bot, HttpClient client, Credentials credentials)

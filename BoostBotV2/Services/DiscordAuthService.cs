@@ -44,7 +44,7 @@ public class DiscordAuthService
         { "silver", 90 },
         { "gold", 200 },
         { "platinum", 500 },
-        { "premium", 1000 }
+        { "premium", int.MaxValue }
     };
 
     public DiscordAuthService(Credentials creds, HttpClient client, DiscordSocketClient discord, Bot bot, DbService db, IPubSub sub)

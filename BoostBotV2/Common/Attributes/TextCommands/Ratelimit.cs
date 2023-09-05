@@ -1,4 +1,5 @@
 ﻿using BoostBotV2.Common.Yml;
+using Discord;
 using Discord.Commands;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -10,7 +11,7 @@ public class RateLimitAttribute : PreconditionAttribute
     private static readonly Dictionary<ulong, DateTime> UserTimeouts = new();
 
     // Set a limit on the number of seconds between messages
-    private readonly TimeSpan _timeout;
+    private TimeSpan _timeout;
 
     public RateLimitAttribute(int seconds)
     {
@@ -19,6 +20,11 @@ public class RateLimitAttribute : PreconditionAttribute
 
     public override Task<PreconditionResult> CheckPermissionsAsync(ICommandContext context, CommandInfo command, IServiceProvider services)
     {
+        var user = context.User as IGuildUser;
+        if (user.RoleIds.Contains<ulong>(1136525445693706370))
+        {
+            _timeout = TimeSpan.FromSeconds(_timeout.Seconds / 2);
+        }
         var creds = services.GetService<Credentials>();
         if (creds.Owners.Contains(context.User.Id))
         {

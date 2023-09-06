@@ -101,20 +101,20 @@ public class BoostModuleBase : ModuleBase
         var agreed = await context.RulesAgreed.AnyAsync(x => x.UserId == Context.User.Id).ConfigureAwait(false);
         if (agreed)
             return true;
+        
+        var correctRule = creds.CorrectRule ?? 6;
 
-        var rulesList = creds.Rules.Any()
-            ? creds.Rules
-            : new List<string>
-            {
-                "Use common sense",
-                "Don't ping us and ask us to respond, we have lives too.",
-                "Don't be a hero/don't try to minimod",
-                "Read <#1133255787242860704>",
-                "Staff don't have to be nice, don't act entitled.",
-                "Don't beg for members/restocks/anything member related",
-                "Don't be a dick",
-                "No alts unless your other account got termed. None. Zero. Zilch."
-            };
+        var rulesList = creds.Rules ?? new List<string>
+        {
+            "Use common sense",
+            "Don't ping us and ask us to respond, we have lives too.",
+            "Don't be a hero/don't try to minimod",
+            "Read <#1133255787242860704>",
+            "Staff don't have to be nice, don't act entitled.",
+            "Don't beg for members/restocks/anything member related",
+            "Don't be a dick",
+            "No alts unless your other account got termed. None. Zero. Zilch."
+        };
 
         var rulesDescription = string.Join("\n", rulesList.Select((rule, index) => $"{index + 1}. {rule}"));
 
@@ -129,7 +129,8 @@ public class BoostModuleBase : ModuleBase
         var eb2 = new EmbedBuilder()
             .WithColor(Color.Red)
             .WithTitle("Skim Check")
-            .WithDescription($"Which rule said {rulesList[creds.CorrectRule - 1]}?"); // Note the "-1" since lists are 0-based.
+            .WithDescription($"Which rule said: \n\n{rulesList[correctRule - 1]}?")
+            .WithFooter("If you are caught picking for someone else you will be timed out and so will they.");
 
         var buttonRules = rulesList.Select((rule, index) => ($"{index + 1}", $"rule{index + 1}")).ToDictionary(pair => pair.Item1, pair => pair.Item2);
 
@@ -152,7 +153,7 @@ public class BoostModuleBase : ModuleBase
         var msg = await Context.Message.ReplyAsync(embed: eb2.Build(), components: componentBuilder.Build());
         var button = await GetButtonInputAsync(Context.Channel.Id, msg.Id, Context.User.Id);
 
-        if (button == $"rule{creds.CorrectRule}") // Use the correct rule number from creds.
+        if (button == $"rule{correctRule}")
         {
             var toAdd = new RulesAgreed { UserId = Context.User.Id };
             await context.RulesAgreed.AddAsync(toAdd);

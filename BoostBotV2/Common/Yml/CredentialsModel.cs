@@ -12,8 +12,8 @@ public class Credentials
     public string Prefix { get; set; }
     public bool RequireAgreement { get; set; }
     public string StoreLink { get; set; }
-    public int CorrectRule { get; set; }
-    public List<string> Rules { get; set; } = new();
+    public int? CorrectRule { get; set; }
+    public List<string>? Rules { get; set; }
     
     public List<ulong> Owners { get; set; }
 }

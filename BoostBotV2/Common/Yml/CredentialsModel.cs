@@ -14,6 +14,5 @@ public class Credentials
     public string StoreLink { get; set; }
     public int? CorrectRule { get; set; }
     public List<string>? Rules { get; set; }
-    
     public List<ulong> Owners { get; set; }
 }

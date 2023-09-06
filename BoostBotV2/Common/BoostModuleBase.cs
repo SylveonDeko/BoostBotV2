@@ -26,6 +26,7 @@ public class BoostModuleBase : ModuleBase
         {
             msg = await Context.Channel.SendMessageAsync(embed: embed.Build(), components: buttons.Build()).ConfigureAwait(false);
         }
+
         try
         {
             var input = await GetButtonInputAsync(msg.Channel.Id, msg.Id, userid).ConfigureAwait(false);
@@ -72,12 +73,12 @@ public class BoostModuleBase : ModuleBase
 
                     if (c.Data.CustomId == "yes")
                     {
-                        if (!alreadyDeferred&& !arg.HasResponded) await c.DeferAsync().ConfigureAwait(false);
+                        if (!alreadyDeferred && !arg.HasResponded) await c.DeferAsync().ConfigureAwait(false);
                         userInputTask.TrySetResult("Yes");
                         return Task.CompletedTask;
                     }
 
-                    if (!alreadyDeferred&& !arg.HasResponded) await c.DeferAsync().ConfigureAwait(false);
+                    if (!alreadyDeferred && !arg.HasResponded) await c.DeferAsync().ConfigureAwait(false);
                     userInputTask.TrySetResult(c.Data.CustomId);
                     return Task.CompletedTask;
                 }).ConfigureAwait(false);
@@ -90,48 +91,48 @@ public class BoostModuleBase : ModuleBase
         if (!creds.RequireAgreement)
             return true;
 
-        var attempts = context.RuleAttempts.Count(x => x.UserId == Context.User.Id && x.DateAdded > DateTime.UtcNow.AddMinutes(5));
+        var attempts = context.RuleAttempts.Count(x => x.UserId == Context.User.Id && x.DateAdded > DateTime.UtcNow.AddMinutes(-5));
         if (attempts >= 3)
         {
             await Context.Channel.SendErrorAsync("Too many attempts. Try again later.").ConfigureAwait(false);
             return false;
         }
-        
+
         var agreed = await context.RulesAgreed.AnyAsync(x => x.UserId == Context.User.Id).ConfigureAwait(false);
         if (agreed)
             return true;
 
+        var rulesList = creds.Rules.Any()
+            ? creds.Rules
+            : new List<string>
+            {
+                "Use common sense",
+                "Don't ping us and ask us to respond, we have lives too.",
+                "Don't be a hero/don't try to minimod",
+                "Read <#1133255787242860704>",
+                "Staff don't have to be nice, don't act entitled.",
+                "Don't beg for members/restocks/anything member related",
+                "Don't be a dick",
+                "No alts unless your other account got termed. None. Zero. Zilch."
+            };
+
+        var rulesDescription = string.Join("\n", rulesList.Select((rule, index) => $"{index + 1}. {rule}"));
+
         var eb = new EmbedBuilder()
             .WithColor(Color.Red)
             .WithTitle("Do you agree to these rules?")
-            .WithDescription("1. Use common sense" +
-                             "\n2. Don't ping us and ask us to respond, we have lives too." +
-                             "\n3. Don't be a hero/don't try to minimod" +
-                             "\n4. Read <#1133255787242860704> " +
-                             "\n5. Staff don't have to be nice, don't act entitled." +
-                             "\n6. Don't beg for members/restocks/anything member related" +
-                             "\n7. Don't be a dick" +
-                             "\n8. No alts unless your other account got termed. None. Zero. Zilch.")
+            .WithDescription(rulesDescription)
             .WithFooter("If you are caught picking for someone else you will be timed out and so will they.");
 
         if (!await PromptUserConfirmAsync(eb, Context.User.Id, true).ConfigureAwait(false)) return false;
+
         var eb2 = new EmbedBuilder()
             .WithColor(Color.Red)
             .WithTitle("Skim Check")
-            .WithDescription("Which rule said no begging?");
-        
-        var buttonRules = new Dictionary<string, string>
-        {
-            {"1", "rule1"},
-            {"2", "rule2"},
-            {"3", "rule3"},
-            {"4", "rule4"},
-            {"5", "rule5"},
-            {"6", "rule6"},
-            {"7", "rule7"},
-            {"8", "rule8"}
-        };
-        
+            .WithDescription($"Which rule said {rulesList[creds.CorrectRule - 1]}?"); // Note the "-1" since lists are 0-based.
+
+        var buttonRules = rulesList.Select((rule, index) => ($"{index + 1}", $"rule{index + 1}")).ToDictionary(pair => pair.Item1, pair => pair.Item2);
+
         var shuffledKeys = buttonRules.Keys.ToList();
         var rng = new Random();
         var n = shuffledKeys.Count;
@@ -141,17 +142,19 @@ public class BoostModuleBase : ModuleBase
             var k = rng.Next(n + 1);
             (shuffledKeys[k], shuffledKeys[n]) = (shuffledKeys[n], shuffledKeys[k]);
         }
-        
+
         var componentBuilder = new ComponentBuilder();
         foreach (var key in shuffledKeys)
         {
             componentBuilder.WithButton(key, buttonRules[key]);
         }
+
         var msg = await Context.Message.ReplyAsync(embed: eb2.Build(), components: componentBuilder.Build());
         var button = await GetButtonInputAsync(Context.Channel.Id, msg.Id, Context.User.Id);
-        if (button == "rule6")
+
+        if (button == $"rule{creds.CorrectRule}") // Use the correct rule number from creds.
         {
-            var toAdd = new RulesAgreed {UserId = Context.User.Id};
+            var toAdd = new RulesAgreed { UserId = Context.User.Id };
             await context.RulesAgreed.AddAsync(toAdd);
             await context.SaveChangesAsync();
             await msg.DeleteAsync();
@@ -159,7 +162,7 @@ public class BoostModuleBase : ModuleBase
         }
 
         await msg.DeleteAsync();
-        await context.RuleAttempts.AddAsync(new RuleAttempts {UserId = Context.User.Id});
+        await context.RuleAttempts.AddAsync(new RuleAttempts { UserId = Context.User.Id });
         await context.SaveChangesAsync();
         await Context.Channel.SendErrorAsync("You failed the skim check. You have to agree to the rules to use the bot.");
         return false;

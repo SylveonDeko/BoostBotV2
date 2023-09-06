@@ -54,6 +54,7 @@ public class OwnerOnly : BoostModuleBase
     [Command("resetrules")]
     [Summary("Resets rules selection for a user")]
     [Usage("resetrules userid")]
+    [IsOwner]
     public async Task ResetRules(ulong userId)
     {
         await using var uow = _db.GetDbContext();
@@ -66,5 +67,25 @@ public class OwnerOnly : BoostModuleBase
                 await uow.SaveChangesAsync();
             }
         }
+    }
+    
+    [Command("resetdjoin")]
+    [Summary("Resets the registed user for a guild")]
+    [Usage("resetdjoin guildid")]
+    [IsOwner]
+    public async Task ResetDJoin(ulong guildId)
+    {
+        await using var uow = _db.GetDbContext();
+        var exists = uow.MemberFarmRegistry.FirstOrDefault(x => x.GuildId == guildId);
+        if (exists is not null)
+        {
+            if (await PromptUserConfirmAsync("Are you sure you want to reset this guild?", Context.User.Id))
+            {
+                uow.MemberFarmRegistry.Remove(exists);
+                await uow.SaveChangesAsync();
+            }
+        }
+        else
+            await Context.Channel.SendErrorAsync("Guild not found.");
     }
 }

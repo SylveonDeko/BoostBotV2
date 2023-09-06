@@ -4,6 +4,7 @@ using BoostBotV2.Common.Yml;
 using BoostBotV2.Db;
 using Discord;
 using Discord.Commands;
+using Discord.WebSocket;
 
 namespace BoostBotV2.Modules;
 
@@ -87,5 +88,36 @@ public class OwnerOnly : BoostModuleBase
         }
         else
             await Context.Channel.SendErrorAsync("Guild not found.");
+    }
+    
+    [Command("getregistered")]
+    [Summary("Gets the registered user for a guild")]
+    [Usage("getregistered guildid")]
+    [IsOwner]
+    public async Task GetRegistered(ulong guildId)
+    {
+        await using var uow = _db.GetDbContext();
+        var exists = uow.MemberFarmRegistry.FirstOrDefault(x => x.GuildId == guildId);
+        if (exists is not null)
+        {
+            var client = Context.Client as DiscordSocketClient;
+            var fetched = await client.Rest.GetUserAsync(exists.UserId);
+
+            if (fetched is not null)
+            {
+                var eb = new EmbedBuilder()
+                    .WithColor(Color.Green)
+                    .WithThumbnailUrl(fetched.GetAvatarUrl())
+                    .WithDescription($"Name: {fetched}\nID: {fetched.Id}\nRegistered On: {TimestampTag.FromDateTime(exists.DateAdded)}");
+                await ReplyAsync(embed: eb.Build());
+            }
+            
+            else
+                await Context.Channel.SendErrorAsync("User not found");
+        }
+        else
+        {
+            await Context.Channel.SendErrorAsync("Guild not registered.");
+        }
     }
 }

@@ -12,6 +12,24 @@ public static class Extensions
     public static async Task ReplyErrorAsync(this IUserMessage userMessage, string message)
         => await userMessage.ReplyAsync(embed: new EmbedBuilder().WithColor(Color.Red).WithDescription(message).Build()).ConfigureAwait(false);
     
+    public static async Task SendConfirmAsync(this IMessageChannel channel, string message)
+        => await channel.SendMessageAsync(embed: new EmbedBuilder().WithColor(Color.Green).WithDescription(message).Build()).ConfigureAwait(false);
+    
+    public static async Task ReplyConfirmAsync(this IUserMessage userMessage, string message)
+        => await userMessage.ReplyAsync(embed: new EmbedBuilder().WithColor(Color.Green).WithDescription(message).Build()).ConfigureAwait(false);
+    
+    public static async Task SendErrorAsync(this IDiscordInteraction channel, string message)
+        => await channel.FollowupAsync(embed: new EmbedBuilder().WithColor(Color.Red).WithDescription(message).Build()).ConfigureAwait(false);
+    
+    public static async Task ReplyErrorAsync(this IDiscordInteraction userMessage, string message)
+        => await userMessage.FollowupAsync(embed: new EmbedBuilder().WithColor(Color.Red).WithDescription(message).Build()).ConfigureAwait(false);
+    
+    public static async Task SendConfirmAsync(this IDiscordInteraction channel, string message)
+        => await channel.FollowupAsync(embed: new EmbedBuilder().WithColor(Color.Green).WithDescription(message).Build()).ConfigureAwait(false);
+    
+    public static async Task ReplyConfirmAsync(this IDiscordInteraction userMessage, string message)
+        => await userMessage.FollowupAsync(embed: new EmbedBuilder().WithColor(Color.Green).WithDescription(message).Build()).ConfigureAwait(false);
+    
     public static string TrimTo(this string str, int maxLength, bool hideDots = false)
     {
         switch (maxLength)

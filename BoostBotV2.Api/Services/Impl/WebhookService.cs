@@ -1,5 +1,4 @@
-﻿using System.Text;
-using BoostBotV2.Api.Common.PubSub;
+﻿using BoostBotV2.Api.Common.PubSub;
 using BoostBotV2.Api.Extensions;
 using BoostBotV2.Api.Models;
 using BoostBotV2.Common.Yml;

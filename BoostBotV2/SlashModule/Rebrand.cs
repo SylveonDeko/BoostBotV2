@@ -1,20 +1,47 @@
-﻿using BoostBotV2.Common.Attributes.Interactions;
+﻿using BoostBotV2.Common;
+using BoostBotV2.Common.Attributes.Interactions;
 using BoostBotV2.Common.Modals;
 using BoostBotV2.Common.Yml;
+using Discord;
 using Discord.Interactions;
 using Serilog;
 
-namespace BoostBotV2.Interactions;
+namespace BoostBotV2.SlashModule;
 
-public class Rebrand : InteractionModuleBase
+public class Rebrand : BoostInteractionModuleBase
 {
-    [ComponentInteraction("rebrand"), IsOwner]
+    [IsOwner]
+    [SlashCommand("rebrand", "Makes a copy of the bot and rebrands it")]
+    public async Task RebrandAsync()
+    {
+        await DeferAsync();
+        var nodeVersion = Extensions.ExecuteCommand("node -v");
+        if (string.IsNullOrWhiteSpace(nodeVersion))
+        {
+            await Context.Interaction.SendErrorAsync("Node is not installed. Install it and try again.");
+            return;
+        }
+        
+        var pm2Details = Extensions.ExecuteCommand("npm list -g pm2");
+        if (!pm2Details.Contains("pm2@"))
+        {
+            await Context.Interaction.SendErrorAsync("PM2 is not installed. Install it using `npm install -g pm2@3.1.3` and try again.");
+            return;
+        }
+        var components = new ComponentBuilder()
+            .WithButton("Press here to get started", "rebrandbutton", ButtonStyle.Success)
+            .Build();
+        
+        await Context.Interaction.FollowupAsync("_ _", components: components);
+    }
+    
+    [ComponentInteraction("rebrandbutton", true), IsOwner]
     public async Task SendRebrandModel()
     {
         await Context.Interaction.RespondWithModalAsync<RebrandModal>("rebrandmodel");
     }
     
-    [ModalInteraction("rebrandmodel")]
+    [ModalInteraction("rebrandmodel", true)]
     public async Task RebrandModal(RebrandModal modal)
     {
         try

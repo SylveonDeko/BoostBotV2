@@ -1,5 +1,4 @@
 ﻿using BoostBotV2.Common.Yml;
-using BoostBotV2.Services;
 using StackExchange.Redis;
 
 // ReSharper disable CollectionNeverQueried.Local

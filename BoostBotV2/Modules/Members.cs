@@ -292,7 +292,7 @@ public partial class Members : BoostModuleBase
             var timeSinceJoin = DateTime.UtcNow - authorInGuild.JoinedAt.Value.UtcDateTime;
             var timeSinceGuildCreation = DateTime.UtcNow - guild.CreatedAt.UtcDateTime;
 
-            if (timeSinceJoin.TotalDays > timeSinceGuildCreation.TotalDays + 1) // +1 to ensure they joined a day or more after the server's creation
+            if (timeSinceJoin.TotalHours > timeSinceGuildCreation.TotalHours + 2) // +1 to ensure they joined a day or more after the server's creation
             {
                 await Context.Message.ReplyErrorAsync("You joined the server too late after the server was created. You cannot use this command.");
                 return;

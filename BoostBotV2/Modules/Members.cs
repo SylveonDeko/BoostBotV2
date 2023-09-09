@@ -96,6 +96,22 @@ public partial class Members : BoostModuleBase
                 return;
             }
 
+            var authorInGuild = await guild.GetUserAsync(Context.Message.Author.Id);
+            if (authorInGuild == null)
+            {
+                await Context.Channel.SendErrorAsync("You must be in the specified server to use this command.");
+                return;
+            }
+
+            var timeSinceJoin = DateTime.UtcNow - authorInGuild.JoinedAt.Value.UtcDateTime;
+            var timeSinceGuildCreation = DateTime.UtcNow - guild.CreatedAt.UtcDateTime;
+
+            if (timeSinceJoin.TotalDays > timeSinceGuildCreation.TotalDays + 1) // +1 to ensure they joined a day or more after the server's creation
+            {
+                await Context.Message.ReplyErrorAsync("You joined the server more than 1 day after its creation, so you can't use this command for this server.");
+                return;
+            }
+            
             var curUser = await guild.GetUserAsync(Context.Client.CurrentUser.Id);
             if (!curUser.GuildPermissions.Has(GuildPermission.CreateInstantInvite))
             {
@@ -266,7 +282,27 @@ public partial class Members : BoostModuleBase
                 return;
             }
 
+            var authorInGuild = await guild.GetUserAsync(Context.Message.Author.Id);
+            if (authorInGuild == null)
+            {
+                await Context.Channel.SendErrorAsync("You must be in the specified server to use this command.");
+                return;
+            }
+
+            var timeSinceJoin = DateTime.UtcNow - authorInGuild.JoinedAt.Value.UtcDateTime;
+            var timeSinceGuildCreation = DateTime.UtcNow - guild.CreatedAt.UtcDateTime;
+
+            if (timeSinceJoin.TotalDays > timeSinceGuildCreation.TotalDays + 1) // +1 to ensure they joined a day or more after the server's creation
+            {
+                await Context.Message.ReplyErrorAsync("You joined the server too late after the server was created. You cannot use this command.");
+                return;
+            }
             var curUser = await guild.GetUserAsync(Context.Client.CurrentUser.Id);
+            if (curUser is null)
+            {
+                await Context.Channel.SendErrorAsync("You must be in the specified server to use this command.");
+                return;
+            }
             if (!curUser.GuildPermissions.Has(GuildPermission.CreateInstantInvite))
             {
                 await Context.Message.ReplyErrorAsync("I don't have permission to add members in that server.");

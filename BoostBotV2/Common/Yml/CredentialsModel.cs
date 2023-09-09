@@ -11,12 +11,12 @@ public class Credentials
     public ulong FarmChannel { get; set; }
     public string Prefix { get; set; }
     public bool RequireAgreement { get; set; }
-    public ulong FreeRoleId { get; set; }
-    public ulong BronzeRoleId { get; set; }
-    public ulong SilverRoleId { get; set; }
-    public ulong GoldRoleId { get; set; }
-    public ulong PlatinumRoleId { get; set; }
-    public ulong PremiumRoleId { get; set; }
+    public ulong FreeRoleId { get; set; } = 1133547572603146280;
+    public ulong BronzeRoleId { get; set; } = 1133565792332554271;
+    public ulong SilverRoleId { get; set; } = 1133593021569585284;
+    public ulong GoldRoleId { get; set; } = 1133593021569585284;
+    public ulong PlatinumRoleId { get; set; } = 1133960226534588446;
+    public ulong PremiumRoleId { get; set; } = 1136525445693706370;
     public string StoreLink { get; set; }
     public int? CorrectRule { get; set; }
     public List<string>? Rules { get; set; }

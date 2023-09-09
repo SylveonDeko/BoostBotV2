@@ -230,7 +230,7 @@ public class Misc : BoostModuleBase
     public async Task Stats()
     {
         var eb = new EmbedBuilder()
-            .WithAuthor("BoostBot v2.1", _client.CurrentUser.GetAvatarUrl(), "https://discord.gg/edotbaby")
+            .WithAuthor("BoostBot v3", _client.CurrentUser.GetAvatarUrl(), "https://discord.gg/edotbaby")
             .AddField("Author", "<@967038397715709962>")
             .AddField("Owners", string.Join("\n", _creds.Owners.Select(x => $"<@{x}>")))
             .AddField("Guilds", _client.Guilds.Count)

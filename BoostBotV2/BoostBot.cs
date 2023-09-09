@@ -151,13 +151,13 @@ namespace BoostBotV2
             {
                 await using var uow = _db.GetDbContext();
                 var blacklists = uow.Blacklists.ToList();
-                if (blacklists.Any(x => x.BlacklistId == arg.User.Id && x.BlacklistType == BlacklistType.User))
+                if (blacklists.Any(x => x.BlacklistId == arg.User.Id && x.BlacklistType == BlacklistType.User) && !Credentials.Owners.Contains(arg.User.Id))
                 {
                     await arg.RespondAsync("You are blacklisted from using this bot.", ephemeral: true);
                     return;
                 }
 
-                if (blacklists.Any(x => x.BlacklistId == arg.GuildId && x.BlacklistType == BlacklistType.Guild))
+                if (blacklists.Any(x => x.BlacklistId == arg.GuildId && x.BlacklistType == BlacklistType.Guild) && !Credentials.Owners.Contains(arg.User.Id))
                 {
                     await arg.RespondAsync("This guild is blacklisted from using this bot.", ephemeral: true);
                     return;

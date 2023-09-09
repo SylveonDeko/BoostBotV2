@@ -1,5 +1,4 @@
-﻿using BoostBotV2.Common.Yml;
-using StackExchange.Redis;
+﻿using StackExchange.Redis;
 
 namespace BoostBotV2.Services.Impl;
 

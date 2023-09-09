@@ -1,20 +1,22 @@
 ﻿using System.Diagnostics;
 using System.Text.RegularExpressions;
 using BoostBotV2.Common;
-using BoostBotV2.Common.Attributes.TextCommands;
+using BoostBotV2.Common.Attributes.Interactions;
+using BoostBotV2.Common.AutoCompleters;
 using BoostBotV2.Common.Yml;
 using BoostBotV2.Db;
 using BoostBotV2.Db.Models;
 using BoostBotV2.Services;
 using Discord;
-using Discord.Commands;
+using Discord.Interactions;
 using Discord.WebSocket;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
-namespace BoostBotV2.Modules;
+namespace BoostBotV2.SlashModule;
 
-public partial class Members : BoostModuleBase
+[Group("members", "Members Commands.")]
+public partial class Members : BoostInteractionModuleBase
 {
     private readonly DiscordAuthService _discordAuthService;
     private readonly DbService _db;
@@ -43,13 +45,11 @@ public partial class Members : BoostModuleBase
         };
     }
 
-    [Command("djoin")]
-    [Summary("Joins a server with the allowed member count for the users highest role")]
-    [Usage("djoin <guild id>")]
+    [SlashCommand("join", "Joins a server with the allowed member count for the users highest role")]
     [IsCommandGuild]
     [RateLimit(30)]
     [IsMembersChannel]
-    public async Task JoinCommand(ulong guildId)
+    public async Task JoinCommand([Autocomplete(typeof(GuildAutoComplete))] string guildName)
     {
         try
         {
@@ -57,19 +57,26 @@ public partial class Members : BoostModuleBase
             var privatestock = false;
             if (!await GetAgreedRules(uow, _credentials))
                 return;
+            
+            if (!ulong.TryParse(guildName, out var guildId))
+            {
+                await Context.Interaction.SendErrorAsync("That is not a valid server ID.");
+                return;
+            }
+            
             var registry = await uow.MemberFarmRegistry.FirstOrDefaultAsync(x => x.GuildId == guildId);
 
             if (uow.Blacklists.Select(x => x.BlacklistId).Contains(guildId))
             {
-                await Context.Message.ReplyErrorAsync("That server ID is blacklisted.");
+                await Context.Interaction.SendErrorAsync("That server ID is blacklisted.");
                 return;
             }
 
             if (registry is not null)
             {
-                if (registry.UserId != Context.Message.Author.Id)
+                if (registry.UserId != Context.User.Id)
                 {
-                    await Context.Message.ReplyErrorAsync("You are not allowed to add members to this server. This account is not the one that registered this server.");
+                    await Context.Interaction.SendErrorAsync("You are not allowed to add members to this server. This account is not the one that registered this server.");
                     return;
                 }
             }
@@ -78,7 +85,7 @@ public partial class Members : BoostModuleBase
                 await uow.MemberFarmRegistry.AddAsync(new MemberFarmRegistry
                 {
                     GuildId = guildId,
-                    UserId = Context.Message.Author.Id
+                    UserId = Context.User.Id
                 });
                 await uow.SaveChangesAsync();
             }
@@ -94,11 +101,11 @@ public partial class Members : BoostModuleBase
                     .WithDescription($"You need to invite the bot to the server before using this command.")
                     .WithColor(Color.Red)
                     .Build();
-                await Context.Message.ReplyAsync(embed: embed, components: button.Build());
+                await Context.Interaction.FollowupAsync(embed: embed, components: button.Build());
                 return;
             }
 
-            var authorInGuild = await guild.GetUserAsync(Context.Message.Author.Id);
+            var authorInGuild = await guild.GetUserAsync(Context.User.Id);
             if (authorInGuild == null)
             {
                 await Context.Channel.SendErrorAsync("You must be in the specified server to use this command.");
@@ -110,23 +117,23 @@ public partial class Members : BoostModuleBase
 
             if (timeSinceJoin.TotalHours > timeSinceGuildCreation.TotalHours + 3)
             {
-                await Context.Message.ReplyErrorAsync("You joined the server too late after its creation, so you can't use this command for this server.");
+                await Context.Interaction.SendErrorAsync("You joined the server too late after its creation, so you can't use this command for this server.");
                 return;
             }
             
             var curUser = await guild.GetUserAsync(Context.Client.CurrentUser.Id);
             if (!curUser.GuildPermissions.Has(GuildPermission.CreateInstantInvite))
             {
-                await Context.Message.ReplyErrorAsync("I don't have permission to add members in that server.");
+                await Context.Interaction.SendErrorAsync("I don't have permission to add members in that server.");
                 return;
             }
 
-            var authorRoles = (Context.Message.Author as SocketGuildUser)?.Roles;
+            var authorRoles = (Context.Interaction.User as SocketGuildUser)?.Roles;
             var highestRole = authorRoles.MaxBy(role => _roleAllowances.TryGetValue(role.Id, out var value) ? value : 0);
 
             if (highestRole == null || !_roleAllowances.ContainsKey(highestRole.Id))
             {
-                await Context.Message.ReplyErrorAsync("You don't have permission to add users to any guild.");
+                await Context.Interaction.SendErrorAsync("You don't have permission to add users to any guild.");
                 return;
             }
 
@@ -146,7 +153,7 @@ public partial class Members : BoostModuleBase
                     var button = new ComponentBuilder()
                         .WithButton("Store Link", url: _credentials.StoreLink, style: ButtonStyle.Link);
 
-                    await Context.Message.ReplyAsync(embed: promoteEb.Build(), components: button.Build());
+                    await Context.Interaction.FollowupAsync(embed: promoteEb.Build(), components: button.Build());
                     return;
                 }
 
@@ -166,7 +173,7 @@ public partial class Members : BoostModuleBase
 
             if (!tokens.Any())
             {
-                await Context.Message.ReplyErrorAsync("# It seems we ran out of stock. Locking channel.");
+                await Context.Interaction.SendErrorAsync("# It seems we ran out of stock. Locking channel.");
                 var channel = Context.Channel as ITextChannel;
                 var current = channel.GetPermissionOverwrite(Context.Guild.EveryoneRole);
                 if (current.HasValue)
@@ -182,7 +189,7 @@ public partial class Members : BoostModuleBase
             var eb = new EmbedBuilder()
                 .WithColor(Color.Orange)
                 .WithDescription($"<a:loading:1136512164551741530> Adding {numTokens} members to the guild '{guild}' for the role '{highestRole.Name}'");
-            var message = await Context.Message.ReplyAsync(embed: eb.Build());
+            var message = await Context.Interaction.FollowupAsync(embed: eb.Build());
 
             var usedTokens = new HashSet<string>();
             var guildUsedTokens = uow.GuildsAdded.Where(x => x.GuildId == guild.Id).Select(x => x.Token).ToHashSet();
@@ -219,7 +226,7 @@ public partial class Members : BoostModuleBase
             }
             else
             {
-                await Context.Message.ReplyErrorAsync("Failed to add members. No stock left to add to your server.");
+                await Context.Interaction.SendErrorAsync("Failed to add members. No stock left to add to your server.");
             }
         }
         catch (Exception e)
@@ -229,33 +236,38 @@ public partial class Members : BoostModuleBase
     }
 
 
-    [Command("djoinonline")]
-    [Summary("Joins a server with the allowed member count for the users highest role (online mode)")]
-    [Usage("djoinonline <guild id>")]
+    [SlashCommand("joinonline", "Joins a server with the allowed online member count for the users highest role")]
     [IsCommandGuild]
     [RateLimit(30)]
     [IsMembersChannel]
     [IsPremium]
-    public async Task OnlineJoinCommand(ulong guildId)
+    public async Task OnlineJoinCommand([Autocomplete(typeof(GuildAutoComplete))] string guildName)
     {
         try
         {
             await using var uow = _db.GetDbContext();
             if (!await GetAgreedRules(uow, _credentials))
                 return;
+            
+            if (!ulong.TryParse(guildName, out var guildId))
+            {
+                await Context.Interaction.SendErrorAsync("That is not a valid server ID.");
+                return;
+            }
+            
             var registry = await uow.MemberFarmRegistry.FirstOrDefaultAsync(x => x.GuildId == guildId);
 
             if (uow.Blacklists.Select(x => x.BlacklistId).Contains(guildId))
             {
-                await Context.Message.ReplyErrorAsync("That server ID is blacklisted.");
+                await Context.Interaction.SendErrorAsync("That server ID is blacklisted.");
                 return;
             }
 
             if (registry is not null)
             {
-                if (registry.UserId != Context.Message.Author.Id)
+                if (registry.UserId != Context.User.Id)
                 {
-                    await Context.Message.ReplyErrorAsync("You are not allowed to add members to this server. This account is not the one that registered this server.");
+                    await Context.Interaction.SendErrorAsync("You are not allowed to add members to this server. This account is not the one that registered this server.");
                     return;
                 }
             }
@@ -264,7 +276,7 @@ public partial class Members : BoostModuleBase
                 await uow.MemberFarmRegistry.AddAsync(new MemberFarmRegistry
                 {
                     GuildId = guildId,
-                    UserId = Context.Message.Author.Id
+                    UserId = Context.User.Id
                 });
                 await uow.SaveChangesAsync();
             }
@@ -280,11 +292,11 @@ public partial class Members : BoostModuleBase
                     .WithDescription($"You need to invite the bot to the server before using this command.")
                     .WithColor(Color.Red)
                     .Build();
-                await Context.Message.ReplyAsync(embed: embed, components: button.Build());
+                await Context.Interaction.FollowupAsync(embed: embed, components: button.Build());
                 return;
             }
 
-            var authorInGuild = await guild.GetUserAsync(Context.Message.Author.Id);
+            var authorInGuild = await guild.GetUserAsync(Context.User.Id);
             if (authorInGuild == null)
             {
                 await Context.Channel.SendErrorAsync("You must be in the specified server to use this command.");
@@ -296,27 +308,27 @@ public partial class Members : BoostModuleBase
 
             if (timeSinceJoin.TotalHours > timeSinceGuildCreation.TotalHours + 2) // +1 to ensure they joined a day or more after the server's creation
             {
-                await Context.Message.ReplyErrorAsync("You joined the server too late after the server was created. You cannot use this command.");
+                await Context.Interaction.SendErrorAsync("You joined the server too late after the server was created. You cannot use this command.");
                 return;
             }
             var curUser = await guild.GetUserAsync(Context.Client.CurrentUser.Id);
             if (curUser is null)
             {
-                await Context.Channel.SendErrorAsync("You must be in the specified server to use this command.");
+                await Context.Interaction.SendErrorAsync("You must be in the specified server to use this command.");
                 return;
             }
             if (!curUser.GuildPermissions.Has(GuildPermission.CreateInstantInvite))
             {
-                await Context.Message.ReplyErrorAsync("I don't have permission to add members in that server.");
+                await Context.Interaction.SendErrorAsync("I don't have permission to add members in that server.");
                 return;
             }
 
-            var authorRoles = (Context.Message.Author as SocketGuildUser)?.Roles;
+            var authorRoles = (Context.User as SocketGuildUser)?.Roles;
            var highestRole = authorRoles.MaxBy(role => _roleAllowances.TryGetValue(role.Id, out var value) ? value : 0);
 
             if (highestRole == null || !_roleAllowances.ContainsKey(highestRole.Id))
             {
-                await Context.Message.ReplyErrorAsync("You don't have permission to add users to any guild.");
+                await Context.Interaction.SendErrorAsync("You don't have permission to add users to any guild.");
                 return;
             }
 
@@ -336,7 +348,7 @@ public partial class Members : BoostModuleBase
                     var button = new ComponentBuilder()
                         .WithButton("Store Link", url: _credentials.StoreLink, style: ButtonStyle.Link);
 
-                    await Context.Message.ReplyAsync(embed: promoteEb.Build(), components: button.Build());
+                    await Context.Interaction.FollowupAsync(embed: promoteEb.Build(), components: button.Build());
                     return;
                 }
 
@@ -357,7 +369,7 @@ public partial class Members : BoostModuleBase
 
             if (!tokens.Any())
             {
-                await Context.Message.ReplyErrorAsync("No Stock.");
+                await Context.Interaction.SendErrorAsync("No Stock.");
                 return;
             }
 
@@ -366,7 +378,7 @@ public partial class Members : BoostModuleBase
             var eb = new EmbedBuilder()
                 .WithColor(Color.Orange)
                 .WithDescription($"<a:loading:1136512164551741530> Adding {numTokens} online members to the guild '{guild}' for the role '{highestRole.Name}'");
-            var message = await Context.Message.ReplyAsync(embed: eb.Build());
+            var message = await Context.Interaction.FollowupAsync(embed: eb.Build());
 
             var usedTokens = new HashSet<string>();
             var guildUsedTokens = uow.GuildsAdded.Where(x => x.GuildId == guild.Id).Select(x => x.Token).ToHashSet();
@@ -403,7 +415,7 @@ public partial class Members : BoostModuleBase
             }
             else
             {
-                await Context.Message.ReplyErrorAsync("Failed to add members. No stock left to add to your server.");
+                await Context.Interaction.SendErrorAsync("Failed to add members. No stock left to add to your server.");
             }
         }
         catch (Exception e)
@@ -413,12 +425,11 @@ public partial class Members : BoostModuleBase
     }
 
 
-    [Command("stock")]
-    [Summary("Shows the amount of members left in stock")]
-    [Usage("stock")]
+    [SlashCommand("stock", "Shows the amount of members in stock")]
     [IsCommandGuild]
     public async Task Stock()
     {
+        await DeferAsync();
         var privateOfflineStock = await _discordAuthService.GetPrivateStock(Context.User.Id);
         var privateOnlineStock = await _discordAuthService.GetPrivateStock(Context.User.Id, true);
         var nitroStock = _discordAuthService.GetBoostTokens(Context.User.Id);
@@ -430,22 +441,25 @@ public partial class Members : BoostModuleBase
             .AddField("Private Stock", $"**Regular Members:** {privateOfflineStock?.Count ?? 0}\n**Online Members:** {privateOnlineStock?.Count ?? 0}\n**Boost:** {nitroStock.Count}")
             .Build();
 
-        await ReplyAsync(embed: embed);
+        await Context.Interaction.FollowupAsync(embed: embed);
     }
 
-    [Command("addedmembers")]
-    [Summary("Shows the amount of members added to a guild")]
-    [Usage("addedmembers <guild id>")]
+    [SlashCommand("addedamount", "Shows the amount of members added to a guild")]
     [IsCommandGuild]
-    public async Task AddedMembers(ulong guildId)
+    public async Task AddedMembers([Autocomplete(typeof(GuildAutoComplete))] string guildName)
     {
         await using var uow = _db.GetDbContext();
         if (!await GetAgreedRules(uow, _credentials))
             return;
+        if (!ulong.TryParse(guildName, out var guildId))
+        {
+            await Context.Interaction.SendErrorAsync("That is not a valid server ID.");
+            return;
+        }
         var guild = await Context.Client.GetGuildAsync(guildId);
         if (guild == null)
         {
-            await ReplyAsync("Guild not found.");
+            await Context.Interaction.SendErrorAsync("Guild not found.");
             return;
         }
 
@@ -455,26 +469,18 @@ public partial class Members : BoostModuleBase
             .WithDescription($"**Added Members:** {addedMembers}")
             .Build();
 
-        await ReplyAsync(embed: embed);
+        await Context.Interaction.FollowupAsync(embed: embed);
     }
 
-    [Command("addstock")]
-    [Summary("Adds members to the stock")]
-    [Usage("addstock <online/offline> <attachment>")]
-    [OwnerOnlyHelp]
+    [SlashCommand("addstock", "Adds members to the stock")]
     [IsOwner]
-    public async Task AddStock(StockEnum stockEnum = StockEnum.Offline)
+    public async Task AddStock(StockEnum stockEnum, IAttachment attachment)
     {
-        var attachment = Context.Message.Attachments.FirstOrDefault();
-        if (attachment == null)
-        {
-            await Context.Channel.SendErrorAsync("No attachment found.");
-            return;
-        }
+        await DeferAsync();
 
         if (attachment.Filename.Split('.').LastOrDefault() != "txt")
         {
-            await Context.Channel.SendErrorAsync("Invalid file type.");
+            await Context.Interaction.SendErrorAsync("Invalid file type.");
             return;
         }
 
@@ -485,7 +491,7 @@ public partial class Members : BoostModuleBase
         {
             if (MyRegex().IsMatch(x)) continue;
             Log.Information(x);
-            await Context.Channel.SendErrorAsync("One or mode invalid members found.");
+            await Context.Interaction.SendErrorAsync("One or mode invalid members found.");
             return;
         }
 
@@ -499,7 +505,7 @@ public partial class Members : BoostModuleBase
                     _bot.OnlineTokens.Add(i);
                 }
 
-                await ReplyAsync($"Added {fileSplit.Length} online members to the stock.");
+                await Context.Interaction.SendConfirmAsync($"Added {fileSplit.Length} online members to the stock.");
                 break;
             case StockEnum.Offline:
                 await File.AppendAllLinesAsync("tokens.txt", fileSplit);
@@ -508,30 +514,22 @@ public partial class Members : BoostModuleBase
                     _bot.Tokens.Add(i);
                 }
 
-                await ReplyAsync($"Added {fileSplit.Length} offline members to the stock.");
+                await Context.Interaction.SendConfirmAsync($"Added {fileSplit.Length} offline members to the stock.");
                 break;
         }
     }
 
-    [Command("addprivatestock")]
-    [Summary("Adds members to your private stock")]
-    [Usage("addprivatestock <online/offline> <attachment>")]
+    [SlashCommand("addprivatestock", "Adds members to your private stock")]
     [RateLimit(90)]
-    public async Task AddPrivateStock(StockEnum stockEnum = StockEnum.Offline)
+    public async Task AddPrivateStock(StockEnum stockEnum, IAttachment attachment)
     {
         await using var uow = _db.GetDbContext();
         if (!await GetAgreedRules(uow, _credentials))
             return;
-        var attachment = Context.Message.Attachments.FirstOrDefault();
-        if (attachment == null)
-        {
-            await Context.Channel.SendErrorAsync("No attachment found.");
-            return;
-        }
 
         if (attachment.Filename.Split('.').LastOrDefault() != "txt")
         {
-            await Context.Channel.SendErrorAsync("Invalid file type.");
+            await Context.Interaction.SendErrorAsync("Invalid file type.");
             return;
         }
 
@@ -542,7 +540,7 @@ public partial class Members : BoostModuleBase
         {
             if (MyRegex().IsMatch(x)) continue;
             Log.Information(x);
-            await Context.Channel.SendErrorAsync("One or mode invalid members found.");
+            await Context.Interaction.SendErrorAsync("One or mode invalid members found.");
             return;
         }
 
@@ -552,31 +550,34 @@ public partial class Members : BoostModuleBase
 
                 await File.AppendAllLinesAsync("onlinetokens.txt", fileSplit);
                 await _discordAuthService.AddMultiplePrivateStock(Context.User.Id, fileSplit, true);
-                await ReplyAsync($"Added {fileSplit.Length} online members to your private stock.");
+                await Context.Interaction.SendConfirmAsync($"Added {fileSplit.Length} online members to your private stock.");
                 break;
             case StockEnum.Offline:
                 await File.AppendAllLinesAsync("tokens.txt", fileSplit);
                 await _discordAuthService.AddMultiplePrivateStock(Context.User.Id, fileSplit);
-                await ReplyAsync($"Added {fileSplit.Length} offline members to your private stock.");
+                await Context.Interaction.SendConfirmAsync($"Added {fileSplit.Length} offline members to your private stock.");
                 break;
         }
     }
 
 
-    [Command("djoinmass")]
-    [Summary("Joins a server with the allowed member count for the users highest role, en masse")]
-    [Usage("djoinmass stocktype <guild id> count")]
+    [SlashCommand("massjoin", "Joins a server with the allowed member count for the users highest role, en masse")]
     [IsCommandGuild]
     [RateLimit(30)]
     [IsMembersChannel]
     [IsPremium]
-    public async Task MassJoinCommand(StockEnum type, ulong guildId, int count)
+    public async Task MassJoinCommand(StockEnum type, [Autocomplete(typeof(GuildAutoComplete))] string guildName, int count)
     {
         try
         {
             await using var uow = _db.GetDbContext();
             if (!await GetAgreedRules(uow, _credentials))
                 return;
+            if (!ulong.TryParse(guildName, out var guildId))
+            {
+                await Context.Interaction.SendErrorAsync("That is not a valid server ID.");
+                return;
+            }
             var guild = await Context.Client.GetGuildAsync(guildId);
             if (guild == null)
             {
@@ -588,23 +589,23 @@ public partial class Members : BoostModuleBase
                     .WithDescription($"You need to invite the bot to the server before using this command.")
                     .WithColor(Color.Red)
                     .Build();
-                await Context.Message.ReplyAsync(embed: embed, components: button.Build());
+                await Context.Interaction.FollowupAsync(embed: embed, components: button.Build());
                 return;
             }
 
             var curUser = await guild.GetUserAsync(Context.Client.CurrentUser.Id);
             if (!curUser.GuildPermissions.Has(GuildPermission.CreateInstantInvite))
             {
-                await Context.Message.ReplyErrorAsync("I don't have permission to add members in that server.");
+                await Context.Interaction.SendErrorAsync("I don't have permission to add members in that server.");
                 return;
             }
 
-            var authorRoles = (Context.Message.Author as SocketGuildUser)?.Roles;
+            var authorRoles = (Context.User as SocketGuildUser)?.Roles;
             var highestRole = authorRoles.MaxBy(role => _roleAllowances.TryGetValue(role.Id, out var value) ? value : 0);
 
             if (highestRole == null || !_roleAllowances.ContainsKey(highestRole.Id))
             {
-                await Context.Message.ReplyErrorAsync("You don't have permission to add users to any guild.");
+                await Context.Interaction.SendErrorAsync("You don't have permission to add users to any guild.");
                 return;
             }
 
@@ -622,7 +623,7 @@ public partial class Members : BoostModuleBase
                     var button = new ComponentBuilder()
                         .WithButton("Store Link", url: _credentials.StoreLink, style: ButtonStyle.Link);
 
-                    await Context.Message.ReplyAsync(embed: promoteEb.Build(), components: button.Build());
+                    await Context.Interaction.FollowupAsync(embed: promoteEb.Build(), components: button.Build());
                     return;
                 }
 
@@ -637,7 +638,7 @@ public partial class Members : BoostModuleBase
                     var button = new ComponentBuilder()
                         .WithButton("Store Link", url: _credentials.StoreLink, style: ButtonStyle.Link);
 
-                    await Context.Message.ReplyAsync(embed: promoteEb.Build(), components: button.Build());
+                    await Context.Interaction.FollowupAsync(embed: promoteEb.Build(), components: button.Build());
                 }
             }
 
@@ -648,7 +649,7 @@ public partial class Members : BoostModuleBase
                     var stock = await _discordAuthService.GetPrivateStock(Context.User.Id, true);
                     if (stock is null || !stock.Any())
                     {
-                        await Context.Message.ReplyErrorAsync("You don't have any members in your private offline stock.");
+                        await Context.Interaction.SendErrorAsync("You don't have any members in your private offline stock.");
                         return;
                     }
 
@@ -659,7 +660,7 @@ public partial class Members : BoostModuleBase
                     var stockonline = await _discordAuthService.GetPrivateStock(Context.User.Id);
                     if (stockonline is null || !stockonline.Any())
                     {
-                        await Context.Message.ReplyErrorAsync("You don't have any members in your private stock.");
+                        await Context.Interaction.SendErrorAsync("You don't have any members in your private stock.");
                         return;
                     }
 
@@ -667,7 +668,7 @@ public partial class Members : BoostModuleBase
                     break;
 
                 default:
-                    await Context.Channel.SendErrorAsync("How the fuck did you get here?");
+                    await Context.Interaction.SendErrorAsync("How the fuck did you get here?");
                     return;
             }
 
@@ -679,7 +680,7 @@ public partial class Members : BoostModuleBase
 
             if (!tokens.Any())
             {
-                await Context.Message.ReplyErrorAsync("No Stock.");
+                await Context.Interaction.SendErrorAsync("No Stock.");
                 return;
             }
 
@@ -688,7 +689,7 @@ public partial class Members : BoostModuleBase
             var eb = new EmbedBuilder()
                 .WithColor(Color.Orange)
                 .WithDescription($"<a:loading:1136512164551741530> Adding {count} members to the guild '{guild}' for the role '{highestRole.Name}'");
-            var message = await Context.Message.ReplyAsync(embed: eb.Build());
+            var message = await Context.Interaction.FollowupAsync(embed: eb.Build());
 
             var usedTokens = new HashSet<string>();
             var guildUsedTokens = uow.GuildsAdded.Where(x => x.GuildId == guild.Id).Select(x => x.Token).ToHashSet();
@@ -698,7 +699,7 @@ public partial class Members : BoostModuleBase
 
             if (availableTokens.Count < count && !availableTokens.Any())
             {
-                await Context.Message.ReplyErrorAsync($"Amount of tokens left is less than the amount of members you want to add ({availableTokens.Count}). Adding anyway.");
+                await Context.Interaction.SendErrorAsync($"Amount of tokens left is less than the amount of members you want to add ({availableTokens.Count}). Adding anyway.");
             }
 
             var sw = new Stopwatch();
@@ -731,7 +732,7 @@ public partial class Members : BoostModuleBase
             }
             else
             {
-                await Context.Message.ReplyErrorAsync("Failed to add members. No stock left to add to your server.");
+                await Context.Interaction.SendErrorAsync("Failed to add members. No stock left to add to your server.");
             }
         }
         catch (Exception e)

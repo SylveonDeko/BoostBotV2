@@ -15,6 +15,7 @@ using Fergun.Interactive;
 using Mewdeko.Common.PubSub;
 using Microsoft.Extensions.DependencyInjection;
 using Serilog;
+using IResult = Discord.Interactions.IResult;
 
 namespace BoostBotV2
 {
@@ -104,6 +105,7 @@ namespace BoostBotV2
                 Log.Error("Error while loading services\n{0}", e);
                 throw;
             }
+
             _client.Ready += ShardReady;
             await clientReady.Task.ConfigureAwait(false);
             Log.Information("Ready!");
@@ -125,9 +127,16 @@ namespace BoostBotV2
                 _client.MessageReceived += HandleCommandAsync;
                 var service = Services.GetRequiredService<InteractionService>();
                 await service.AddModulesAsync(Assembly.GetEntryAssembly(), Services);
+#if DEBUG
+                await service.RegisterCommandsToGuildAsync(Credentials.CommandGuild);
+#else
+                await service.RegisterCommandsGloballyAsync();
+#endif
+                
                 _client.InteractionCreated += HandleInteractionAsync;
-                Tokens = File.ReadAllLines("tokens.txt").ToHashSet();
-                OnlineTokens = File.ReadAllLines("onlinetokens.txt").ToHashSet();
+                Tokens = (await File.ReadAllLinesAsync("tokens.txt")).ToHashSet();
+                OnlineTokens = (await File.ReadAllLinesAsync("onlinetokens.txt")).ToHashSet();
+                service.SlashCommandExecuted += HandleCommands;
             }
             catch (Exception e)
             {
@@ -176,6 +185,7 @@ namespace BoostBotV2
                 Log.Error("Command Guild not specified, cannot start");
                 Environment.Exit(1);
             }
+
             if (File.Exists("tokens.txt"))
             {
                 Tokens = (await File.ReadAllLinesAsync("tokens.txt")).ToHashSet();
@@ -184,7 +194,7 @@ namespace BoostBotV2
             {
                 File.Create("tokens.txt");
             }
-            
+
             if (File.Exists("onlinetokens.txt"))
             {
                 OnlineTokens = (await File.ReadAllLinesAsync("onlinetokens.txt")).ToHashSet();
@@ -214,6 +224,57 @@ namespace BoostBotV2
         {
             await RunAsync().ConfigureAwait(false);
             await Task.Delay(-1).ConfigureAwait(false);
+        }
+
+        private Task HandleCommands(SlashCommandInfo slashInfo, IInteractionContext ctx, IResult result)
+        {
+            _ = Task.Run(async () =>
+            {
+                var toFetch = await _client.Rest.GetChannelAsync(Credentials.CommandLogChannel).ConfigureAwait(false);
+                if (!result.IsSuccess)
+                {
+                    await ctx.Interaction.SendErrorAsync($"Command failed for the following reason:\n{result.ErrorReason}").ConfigureAwait(false);
+                    Log.Warning("Slash Command Errored\n\t" + "User: {0}\n\t" + "Server: {1}\n\t" + "Channel: {2}\n\t" + "Message: {3}\n\t" + "Error: {4}",
+                        $"{ctx.User} [{ctx.User.Id}]", // {0}
+                        ctx.Guild == null ? "PRIVATE" : $"{ctx.Guild.Name} [{ctx.Guild.Id}]", // {1}
+                        ctx.Channel == null ? "PRIVATE" : $"{ctx.Channel.Name} [{ctx.Channel.Id}]", // {2}
+                        slashInfo.MethodName, result.ErrorReason);
+
+                    if (toFetch is not RestTextChannel restChannel) return;
+                    var eb = new EmbedBuilder()
+                        .WithColor(Color.Red)
+                        .WithTitle("Slash Command Errored.")
+                        .AddField("Reason", result.ErrorReason)
+                        .AddField("Module", slashInfo.Module.Name ?? "None")
+                        .AddField("Command", slashInfo.Name)
+                        .AddField("User", $"{ctx.User.Mention} `{ctx.User.Id}`")
+                        .AddField("Guild", ctx.Guild == null ? "PRIVATE" : $"{ctx.Guild.Name} `{ctx.Guild.Id}`");
+
+                    await restChannel.SendMessageAsync(embed: eb.Build()).ConfigureAwait(false);
+                    return;
+                }
+
+                var chan = ctx.Channel as ITextChannel;
+                Log.Information("Slash Command Executed" + "\n\t" + "User: {0}\n\t" + "Server: {1}\n\t" + "Channel: {2}\n\t" + "Module: {3}\n\t" + "Command: {4}",
+                    $"{ctx.User} [{ctx.User.Id}]", // {0}
+                    ctx.Guild == null ? "PRIVATE" : $"{ctx.Guild.Name} [{ctx.Guild.Id}]", // {1}
+                    chan == null ? "PRIVATE" : $"{chan.Name} [{chan.Id}]", // {2}
+                    slashInfo.Module.SlashGroupName, slashInfo.MethodName); // {3}
+
+                if (toFetch is RestTextChannel restChannel1)
+                {
+                    var eb = new EmbedBuilder()
+                        .WithColor(Color.Green)
+                        .WithTitle("Slash Command Executed.")
+                        .AddField("Module", slashInfo.Module.Name ?? "None")
+                        .AddField("Command", slashInfo.Name)
+                        .AddField("User", $"{ctx.User.Mention} `{ctx.User.Id}`")
+                        .AddField("Guild", ctx.Guild == null ? "PRIVATE" : $"{ctx.Guild.Name} `{ctx.Guild.Id}`");
+
+                    await restChannel1.SendMessageAsync(embed: eb.Build()).ConfigureAwait(false);
+                }
+            });
+            return Task.CompletedTask;
         }
 
         private Task HandleCommandAsync(SocketMessage messageParam)
@@ -262,7 +323,7 @@ namespace BoostBotV2
                         .WithDescription(executed.ErrorReason)
                         .WithAuthor("Error", _client.CurrentUser.GetAvatarUrl())
                         .WithCurrentTimestamp();
-                    
+
                     await message.Channel.SendMessageAsync(embed: eb.Build());
                 }
             });

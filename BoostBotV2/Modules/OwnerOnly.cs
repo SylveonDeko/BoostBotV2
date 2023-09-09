@@ -120,4 +120,55 @@ public class OwnerOnly : BoostModuleBase
             await Context.Channel.SendErrorAsync("Guild not registered.");
         }
     }
+    
+    [Command("settieredrole")]
+    [Summary("Sets the tiered role ID")]
+    [Usage("settieredrole <free|bronze|silver|gold|platinum|premium> @role")]
+    [IsOwner]
+    public async Task SetTieredRole(Tier tier, [Remainder] IRole role)
+    {
+        switch (tier)
+        {
+            case Tier.Free:
+                _creds.FreeRoleId = role.Id;
+                SerializeYml.Serialize(_creds);
+                await Context.Channel.SendConfirmAsync($"Free role set {role.Mention}");
+                break;
+            case Tier.Bronze:
+                _creds.BronzeRoleId = role.Id;
+                SerializeYml.Serialize(_creds);
+                await Context.Channel.SendConfirmAsync($"Bronze role set {role.Mention}");
+                break;
+            case Tier.Silver:
+                _creds.SilverRoleId = role.Id;
+                SerializeYml.Serialize(_creds);
+                await Context.Channel.SendConfirmAsync($"Silver role set {role.Mention}");
+                break;
+            case Tier.Gold:
+                _creds.GoldRoleId = role.Id;
+                SerializeYml.Serialize(_creds);
+                await Context.Channel.SendConfirmAsync($"Gold role set {role.Mention}");
+                break;
+            case Tier.Platinum:
+                _creds.PlatinumRoleId = role.Id;
+                SerializeYml.Serialize(_creds);
+                await Context.Channel.SendConfirmAsync($"Platinum role set {role.Mention}");
+                break;
+            case Tier.Premium:
+                _creds.PremiumRoleId = role.Id;
+                SerializeYml.Serialize(_creds);
+                await Context.Channel.SendConfirmAsync($"Premium role set {role.Mention}");
+                break;
+        }
+    }
+
+    public enum Tier
+    {
+        Free,
+        Bronze,
+        Silver,
+        Gold,
+        Platinum,
+        Premium
+    }
 }

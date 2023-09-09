@@ -37,19 +37,19 @@ public class DiscordAuthService
     private const int BuildNumber = 165486;
     private const string Cv = "108.0.0.0";
     private readonly string _properties;
-    private static readonly Dictionary<string, int> MemberAddAllowences = new()
-    {
-        { "free", 48 },
-        { "bronze", 70 },
-        { "silver", 90 },
-        { "gold", 200 },
-        { "platinum", 500 },
-        { "premium", int.MaxValue }
-    };
-
+    private Dictionary<ulong, int> _memberAddAllowances;
     public DiscordAuthService(Credentials creds, HttpClient client, DiscordSocketClient discord, Bot bot, DbService db, IPubSub sub)
     {
         _creds = creds;
+        _memberAddAllowances = new Dictionary<ulong, int>
+        {
+            { creds.FreeRoleId, 48 },
+            { creds.BronzeRoleId, 70 },
+            { creds.SilverRoleId, 90 },
+            { creds.GoldRoleId, 200 },
+            { creds.PlatinumRoleId, 500 },
+            { creds.PremiumRoleId, int.MaxValue }
+        };
         _client = client;
         _discord = discord;
         _bot = bot;
@@ -467,12 +467,12 @@ public class DiscordAuthService
         return _privateofflinestock[userId];
     }
 
-    public async Task<(int? RemainingCount, DateTime? remainingTime)> GetAllowedAddCount(ulong userId, string rolename, ulong guildId)
+    public async Task<(int? RemainingCount, DateTime? remainingTime)> GetAllowedAddCount(ulong userId, ulong roleId, ulong guildId)
     {
         if (_creds.Owners.Contains(userId))
             return (null, null);
 
-        MemberAddAllowences.TryGetValue(rolename, out var allowed);
+        _memberAddAllowances.TryGetValue(roleId, out var allowed);
 
         await using var uow = _db.GetDbContext();
         var registry = await uow.MemberFarmRegistry.FirstOrDefaultAsync(x => x.UserId == userId);

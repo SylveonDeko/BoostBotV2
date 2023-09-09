@@ -280,6 +280,7 @@ public class OwnerOnly : BoostInteractionModuleBase
     [IsOwner]
     public async Task SetEmotes(EmoteType type, string emote2)
     {
+        await DeferAsync();
         switch (type)
         {
             case EmoteType.Success:

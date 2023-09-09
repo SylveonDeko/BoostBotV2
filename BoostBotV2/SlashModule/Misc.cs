@@ -30,6 +30,7 @@ public class Misc : BoostInteractionModuleBase
     [SlashCommand("addbot", "Add the bot to your server")]
     public async Task AddBotAsync()
     {
+        await DeferAsync();
         var components = new ComponentBuilder()
             .WithButton("Add To Server", style: ButtonStyle.Link, url: $"https://discord.com/oauth2/authorize?client_id={_client.CurrentUser.Id}&scope=bot&permissions=1")
             .Build();
@@ -37,12 +38,13 @@ public class Misc : BoostInteractionModuleBase
             .WithColor(Color.Purple)
             .WithTitle(Context.Client.CurrentUser.ToString())
             .WithDescription($"Add {Context.Client.CurrentUser} to your server using the button below:");
-        await ReplyAsync(embed: eb.Build(), components: components);
+        await Context.Interaction.FollowupAsync(embed: eb.Build(), components: components);
     }
 
     [SlashCommand("stats", "Get bot stats")]
     public async Task Stats()
     {
+        await DeferAsync();
         await using var uow = _db.GetDbContext();
         var eb = new EmbedBuilder()
             .WithAuthor("BoostBot v3", _client.CurrentUser.GetAvatarUrl(), "https://discord.gg/edotbaby")
@@ -56,6 +58,6 @@ public class Misc : BoostInteractionModuleBase
             .AddField("Uptime", $"{(DateTime.Now - Process.GetCurrentProcess().StartTime).Days} days, {(DateTime.Now - Process.GetCurrentProcess().StartTime).Hours} hours, {(DateTime.Now - Process.GetCurrentProcess().StartTime).Minutes} minutes, {(DateTime.Now - Process.GetCurrentProcess().StartTime).Seconds} seconds")
             .WithColor(Color.Purple);
         
-        await ReplyAsync(embed: eb.Build());
+        await Context.Interaction.FollowupAsync(embed: eb.Build());
     }
 }

@@ -275,6 +275,41 @@ public class OwnerOnly : BoostInteractionModuleBase
                 break;
         }
     }
+    
+    [SlashCommand("setemotes", "Sets the emotes for the bot")]
+    [IsOwner]
+    public async Task SetEmotes(EmoteType type, string emote2)
+    {
+        switch (type)
+        {
+            case EmoteType.Success:
+                if (emote2.ToIEmote() is null)
+                {
+                    await Context.Interaction.SendErrorAsync("Emote not found.");
+                    return;
+                }
+                _creds.SuccessEmote = emote2;
+                SerializeYml.Serialize(_creds);
+                await Context.Interaction.SendConfirmAsync($"Success emote set to {emote2}");
+                break;
+            case EmoteType.Loading:
+                if (emote2.ToIEmote() is null)
+                {
+                    await Context.Interaction.SendErrorAsync("Emote not found.");
+                    return;
+                }
+                _creds.LoadingEmote = emote2;
+                SerializeYml.Serialize(_creds);
+                await Context.Interaction.SendConfirmAsync($"Loading emote set to {emote2}");
+                break;
+        }
+    }
+
+    public enum EmoteType
+    {
+        Loading,
+        Success
+    }
 
     public enum Tier
     {

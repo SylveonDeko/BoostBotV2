@@ -219,8 +219,8 @@ public class Misc : BoostModuleBase
             .Build();
         var eb = new EmbedBuilder()
             .WithColor(Color.Purple)
-            .WithTitle("Qsxt")
-            .WithDescription("Add Qsxt to your server using the button below:");
+            .WithTitle(Context.Client.CurrentUser.ToString())
+            .WithDescription($"Add {Context.Client.CurrentUser} to your server using the button below:");
         await ReplyAsync(embed: eb.Build(), components: components);
     }
 
@@ -229,6 +229,7 @@ public class Misc : BoostModuleBase
     [Summary("Displays bot stats.")]
     public async Task Stats()
     {
+        await using var uow = _db.GetDbContext();
         var eb = new EmbedBuilder()
             .WithAuthor("BoostBot v3", _client.CurrentUser.GetAvatarUrl(), "https://discord.gg/edotbaby")
             .AddField("Author", "<@967038397715709962>")
@@ -237,6 +238,7 @@ public class Misc : BoostModuleBase
             .AddField("Users", _client.Guilds.Sum(x => x.MemberCount))
             .AddField("Channels", _client.Guilds.Sum(x => x.Channels.Count))
             .AddField("Commands", _commandService.Commands.Count())
+            .AddField("Total Added Members", uow.GuildsAdded.Count())
             .AddField("Uptime", $"{(DateTime.Now - Process.GetCurrentProcess().StartTime).Days} days, {(DateTime.Now - Process.GetCurrentProcess().StartTime).Hours} hours, {(DateTime.Now - Process.GetCurrentProcess().StartTime).Minutes} minutes, {(DateTime.Now - Process.GetCurrentProcess().StartTime).Seconds} seconds")
             .WithColor(Color.Purple);
         

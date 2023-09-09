@@ -17,6 +17,8 @@ public class Credentials
     public ulong GoldRoleId { get; set; } = 1133593021569585284;
     public ulong PlatinumRoleId { get; set; } = 1133960226534588446;
     public ulong PremiumRoleId { get; set; } = 1136525445693706370;
+    public string LoadingEmote { get; set; } = "<a:loading:1136512164551741530>";
+    public string SuccessEmote { get; set; } = "✅";
     public string StoreLink { get; set; }
     public int? CorrectRule { get; set; }
     public List<string>? Rules { get; set; }

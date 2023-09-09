@@ -181,7 +181,7 @@ public partial class Members : BoostModuleBase
             var successCount = 0;
             var eb = new EmbedBuilder()
                 .WithColor(Color.Orange)
-                .WithDescription($"<a:loading:1136512164551741530> Adding {numTokens} members to the guild '{guild}' for the role '{highestRole.Name}'");
+                .WithDescription($"{_credentials.LoadingEmote} Adding {numTokens} members to the guild '{guild}' for the role '{highestRole.Name}'");
             var message = await Context.Message.ReplyAsync(embed: eb.Build());
 
             var usedTokens = new HashSet<string>();
@@ -209,7 +209,7 @@ public partial class Members : BoostModuleBase
             if (successCount > 0)
             {
                 var embed = new EmbedBuilder()
-                    .WithDescription($"✅ Added members to the guild '{guild}' for the role '{highestRole.Name}' ({successCount}/{numTokens} tokens used).")
+                    .WithDescription($"{_credentials.SuccessEmote} Added members to the guild '{guild}' for the role '{highestRole.Name}' ({successCount}/{numTokens} tokens used).")
                     .WithFooter($"Took {sw.Elapsed:g} to add {successCount} members to {guild}")
                     .WithColor(Color.Green)
                     .Build();
@@ -365,7 +365,7 @@ public partial class Members : BoostModuleBase
             var failedCount = 0;
             var eb = new EmbedBuilder()
                 .WithColor(Color.Orange)
-                .WithDescription($"<a:loading:1136512164551741530> Adding {numTokens} online members to the guild '{guild}' for the role '{highestRole.Name}'");
+                .WithDescription($"{_credentials.LoadingEmote} Adding {numTokens} online members to the guild '{guild}' for the role '{highestRole.Name}'");
             var message = await Context.Message.ReplyAsync(embed: eb.Build());
 
             var usedTokens = new HashSet<string>();
@@ -393,7 +393,7 @@ public partial class Members : BoostModuleBase
             if (successCount > 0)
             {
                 var embed = new EmbedBuilder()
-                    .WithDescription($"✅ Added online members to the guild '{guild}' for the role '{highestRole.Name}' ({successCount}/{numTokens} members used).")
+                    .WithDescription($"{_credentials.SuccessEmote} Added online members to the guild '{guild}' for the role '{highestRole.Name}' ({successCount}/{numTokens} members used).")
                     .WithFooter($"Took {sw.Elapsed:g} to add {successCount} members. Removed {failedCount} non working members.")
                     .WithColor(Color.Green)
                     .Build();
@@ -687,7 +687,7 @@ public partial class Members : BoostModuleBase
             var failedCount = 0;
             var eb = new EmbedBuilder()
                 .WithColor(Color.Orange)
-                .WithDescription($"<a:loading:1136512164551741530> Adding {count} members to the guild '{guild}' for the role '{highestRole.Name}'");
+                .WithDescription($"{_credentials.LoadingEmote} Adding {count} members to the guild '{guild}' for the role '{highestRole.Name}'");
             var message = await Context.Message.ReplyAsync(embed: eb.Build());
 
             var usedTokens = new HashSet<string>();
@@ -721,7 +721,7 @@ public partial class Members : BoostModuleBase
             if (successCount > 0)
             {
                 var embed = new EmbedBuilder()
-                    .WithDescription($"✅ Added the members to the guild '{guild}' for the role '{highestRole.Name}' ({successCount}/{count} members used).")
+                    .WithDescription($"{_credentials.SuccessEmote} Added the members to the guild '{guild}' for the role '{highestRole.Name}' ({successCount}/{count} members used).")
                     .WithFooter($"Took {sw.Elapsed:g} to add {successCount} members. Removed {failedCount} non working members.")
                     .WithColor(Color.Green)
                     .Build();

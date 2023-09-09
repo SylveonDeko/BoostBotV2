@@ -105,6 +105,11 @@ public static class Extensions
         return result.Trim();
     }
     
+    public static IEmote? ToIEmote(this string emojiStr) =>
+        Emote.TryParse(emojiStr, out var maybeEmote)
+            ? maybeEmote
+            : new Emoji(emojiStr);
+    
     /// <summary>
     ///     Creates a task that will complete when all of the <see cref="Task{TResult}" /> objects in an enumerable
     ///     collection have completed

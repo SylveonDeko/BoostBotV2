@@ -21,16 +21,16 @@ public class RateLimitAttribute : PreconditionAttribute
     public override Task<PreconditionResult> CheckPermissionsAsync(ICommandContext context, CommandInfo command, IServiceProvider services)
     {
         var user = context.User as IGuildUser;
+        var creds = services.GetRequiredService<Credentials>();
 
         // Use a local variable for timeout
         var currentTimeout = _timeout;
 
-        if (user.RoleIds.Contains<ulong>(1136525445693706370))
+        if (user.RoleIds.Contains<ulong>(creds.PremiumRoleId))
         {
             currentTimeout = TimeSpan.FromSeconds(_timeout.Seconds / 2);
         }
-
-        var creds = services.GetService<Credentials>();
+        
         if (creds.Owners.Contains(context.User.Id))
         {
             return Task.FromResult(PreconditionResult.FromSuccess());

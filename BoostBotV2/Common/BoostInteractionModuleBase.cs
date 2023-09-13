@@ -144,7 +144,7 @@ public class BoostInteractionModuleBase : InteractionModuleBase
         }
 
         var msg = await Context.Interaction.FollowupAsync(embed: eb2.Build(), components: componentBuilder.Build());
-        var button = await GetButtonInputAsync(Context.Channel.Id, msg.Id, Context.User.Id);
+        var button = await GetButtonInputAsync(Context.Channel.Id, msg.Id, Context.User.Id, true);
 
         if (button == $"rule{correctRule}")
         {

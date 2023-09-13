@@ -13,6 +13,6 @@ public class IsPremium : PreconditionAttribute
         if (creds.Owners.Contains(context.User.Id))
             return PreconditionResult.FromSuccess();
         var user = context.User as IGuildUser;
-        return user.RoleIds.Contains<ulong>(1136525445693706370) ? PreconditionResult.FromSuccess() : PreconditionResult.FromError("This command can only be used by premium users.");
+        return user.RoleIds.Contains<ulong>(creds.PremiumRoleId) ? PreconditionResult.FromSuccess() : PreconditionResult.FromError("This command can only be used by premium users.");
     }
 }

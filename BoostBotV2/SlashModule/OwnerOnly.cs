@@ -244,31 +244,61 @@ public class OwnerOnly : BoostInteractionModuleBase
         switch (tier)
         {
             case Tier.Free:
+                if (_creds.BronzeRoleId == role.Id || _creds.SilverRoleId == role.Id || _creds.GoldRoleId == role.Id || _creds.PlatinumRoleId == role.Id || _creds.PremiumRoleId == role.Id)
+                {
+                    await Context.Interaction.SendErrorAsync("Role already set as a tiered role.");
+                    return;
+                }
                 _creds.FreeRoleId = role.Id;
                 SerializeYml.Serialize(_creds);
                 await Context.Interaction.SendConfirmAsync($"Free role set {role.Mention}");
                 break;
             case Tier.Bronze:
+                if (_creds.FreeRoleId == role.Id || _creds.SilverRoleId == role.Id || _creds.GoldRoleId == role.Id || _creds.PlatinumRoleId == role.Id || _creds.PremiumRoleId == role.Id)
+                {
+                    await Context.Interaction.SendErrorAsync("Role already set as a tiered role.");
+                    return;
+                }
                 _creds.BronzeRoleId = role.Id;
                 SerializeYml.Serialize(_creds);
                 await Context.Interaction.SendConfirmAsync($"Bronze role set {role.Mention}");
                 break;
             case Tier.Silver:
+                if (_creds.BronzeRoleId == role.Id || _creds.FreeRoleId == role.Id || _creds.GoldRoleId == role.Id || _creds.PlatinumRoleId == role.Id || _creds.PremiumRoleId == role.Id)
+                {
+                    await Context.Interaction.SendErrorAsync("Role already set as a tiered role.");
+                    return;
+                }
                 _creds.SilverRoleId = role.Id;
                 SerializeYml.Serialize(_creds);
                 await Context.Interaction.SendConfirmAsync($"Silver role set {role.Mention}");
                 break;
             case Tier.Gold:
+                if (_creds.BronzeRoleId == role.Id || _creds.SilverRoleId == role.Id || _creds.FreeRoleId == role.Id || _creds.PlatinumRoleId == role.Id || _creds.PremiumRoleId == role.Id)
+                {
+                    await Context.Interaction.SendErrorAsync("Role already set as a tiered role.");
+                    return;
+                }
                 _creds.GoldRoleId = role.Id;
                 SerializeYml.Serialize(_creds);
                 await Context.Interaction.SendConfirmAsync($"Gold role set {role.Mention}");
                 break;
             case Tier.Platinum:
+                if (_creds.BronzeRoleId == role.Id || _creds.SilverRoleId == role.Id || _creds.GoldRoleId == role.Id || _creds.FreeRoleId == role.Id || _creds.PremiumRoleId == role.Id)
+                {
+                    await Context.Interaction.SendErrorAsync("Role already set as a tiered role.");
+                    return;
+                }
                 _creds.PlatinumRoleId = role.Id;
                 SerializeYml.Serialize(_creds);
                 await Context.Interaction.SendConfirmAsync($"Platinum role set {role.Mention}");
                 break;
             case Tier.Premium:
+                if (_creds.BronzeRoleId == role.Id || _creds.SilverRoleId == role.Id || _creds.GoldRoleId == role.Id || _creds.PlatinumRoleId == role.Id || _creds.FreeRoleId == role.Id)
+                {
+                    await Context.Interaction.SendErrorAsync("Role already set as a tiered role.");
+                    return;
+                }
                 _creds.PremiumRoleId = role.Id;
                 SerializeYml.Serialize(_creds);
                 await Context.Interaction.SendConfirmAsync($"Premium role set {role.Mention}");

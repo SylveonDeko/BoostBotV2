@@ -1,8 +1,10 @@
-﻿using System.Net.WebSockets;
+﻿using System.Collections.Concurrent;
+using System.Net.WebSockets;
 using System.Text;
 using BoostBotV2.Services.Impl.Models;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Serilog;
 
 namespace BoostBotV2.Services;
 
@@ -11,6 +13,12 @@ public class Onliner
     private readonly string _token;
     private readonly ClientWebSocket _ws;
     private readonly OnlinerConfig _config;
+    
+    private readonly ConcurrentQueue<DateTime> _requestTimestamps = new();
+    private readonly int _maxRequests = 10;
+    private readonly TimeSpan _rateLimitPeriod = TimeSpan.FromSeconds(10);
+    private readonly SemaphoreSlim _rateLimitSemaphore = new(1, 1);
+
 
     private static readonly Lazy<List<SpotifySong>> Songs = new(() => JsonConvert.DeserializeObject<List<SpotifySong>>(File.ReadAllText("spotify songs.json")));
     private static readonly Lazy<List<string>> CustomStatuses = new(() => new List<string>(File.ReadAllLines("custom status.txt")));
@@ -34,11 +42,55 @@ public class Onliner
         await MaintainConnection(heartbeatInterval);
     }
 
+    private async Task CheckRateLimit()
+    {
+        await _rateLimitSemaphore.WaitAsync();
+
+        try
+        {
+            if (_requestTimestamps.TryPeek(out var firstTimestamp))
+            {
+                while (_requestTimestamps.Count >= _maxRequests)
+                {
+                    var timeSinceFirstRequest = DateTime.UtcNow - firstTimestamp;
+                    if (timeSinceFirstRequest >= _rateLimitPeriod)
+                    {
+                        _requestTimestamps.TryDequeue(out _);
+                        _requestTimestamps.TryPeek(out firstTimestamp);
+                    }
+                    else
+                    {
+                        var delay = _rateLimitPeriod - timeSinceFirstRequest;
+                        await Task.Delay(delay);
+                    }
+                }
+            }
+
+            _requestTimestamps.Enqueue(DateTime.UtcNow);
+        }
+        finally
+        {
+            _rateLimitSemaphore.Release();
+        }
+    }
+    
+    
     private async Task EstablishWebSocket()
     {
         if (_ws.State is WebSocketState.None or WebSocketState.Closed)
         {
-            await _ws.ConnectAsync(new Uri("wss://gateway.discord.gg/?v=6&encoding=json"), CancellationToken.None);
+            try
+            {
+                await _ws.ConnectAsync(new Uri("wss://gateway.discord.gg/?v=6&encoding=json"), CancellationToken.None);
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine($"WebSocket connection error: {ex.Message}");
+            }
+        }
+        else
+        {
+            Console.WriteLine($"WebSocket is already in state: {_ws.State}");
         }
     }
 
@@ -143,15 +195,18 @@ public class Onliner
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                Log.Error($"Error: {ex.Message}");
 
                 if (_ws.State is WebSocketState.Closed or WebSocketState.Aborted)
                 {
-                    Console.WriteLine("Attempting to reconnect in 5 seconds...");
+                    Log.Information("Attempting to reconnect in 5 seconds...");
                     await Task.Delay(5000); // Wait for 5 seconds before trying to reconnect
                     await Connect();
                 }
-                // Avoid infinite recursion by not calling MaintainConnection() here again
+                else
+                {
+                    Log.Information($"WebSocket is in state: {_ws.State}");
+                }
             }
         }
     }
@@ -303,6 +358,7 @@ public class Onliner
 
     private async Task SendWebSocketMessage(object payload)
     {
+        await CheckRateLimit();
         var payloadString = JsonConvert.SerializeObject(payload);
         await _ws.SendAsync(
             new ArraySegment<byte>(Encoding.UTF8.GetBytes(payloadString)),

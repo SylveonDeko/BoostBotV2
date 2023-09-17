@@ -95,31 +95,6 @@ namespace BoostBotV2
                 throw;
             }
 
-            _ = Task.Run(async () =>
-            {
-                if (OnlineTokens.Any())
-                {
-                    Log.Information("Onlining Normal Online Tokens");
-                    var tasks = OnlineTokens.Select(async i =>
-                    {
-                        try
-                        {
-                            var onliner = new Onliner(i);
-                            await onliner.Connect();
-                        }
-                        catch (Exception e)
-                        {
-                            Log.Error(e, "Error while logging in");
-                            // Decide if you want to throw or just log the error.
-                            // If you throw here, one failure will result in Task.WhenAll failing.
-                            // throw;
-                        }
-                    }).ToList();
-
-                    await Task.WhenAll(tasks);
-                }
-            });
-
             Log.Information("Loading services...");
             try
             {
@@ -131,58 +106,35 @@ namespace BoostBotV2
                 throw;
             }
 
+            HashSet<string> toProcess = new();
             var toOnline = _db.GetDbContext();
             var online = toOnline.PrivateStock.Where(x => x.IsOnline).ToHashSet();
+            if (OnlineTokens.Any())
+            {
+                foreach (var i in OnlineTokens.Where(i => !toProcess.TryGetValue(i, out _)))
+                {
+                    toProcess.Add(i);
+                }
+            }
             if (online.Any())
             {
-                _ = Task.Run(async () =>
+                foreach (var i in online.Where(i => !toProcess.TryGetValue(i.Token, out _)))
                 {
-                    Log.Information("Onlining Private Stock Tokens");
-                    var tasks = online.Select(async i =>
-                    {
-                        try
-                        {
-                            var onliner = new Onliner(i.Token);
-                            await onliner.Connect();
-                        }
-                        catch (Exception e)
-                        {
-                            Log.Error(e, "Error while logging in");
-                            // Decide if you want to throw or just log the error.
-                            // If you throw here, one failure will result in Task.WhenAll failing.
-                            // throw;
-                        }
-                    }).ToList();
-
-                    await Task.WhenAll(tasks);
-                });
+                    toProcess.Add(i.Token);
+                }
             }
 
             if (toOnline.KeepOnline.Any())
             {
-                _ = Task.Run(async () =>
+                foreach (var i in toOnline.KeepOnline.ToHashSet().Where(i => !toProcess.TryGetValue(i.Token, out _)))
                 {
-                    Log.Information("Onlining KeepOnline Tokens");
-                    var tasks = toOnline.KeepOnline.ToHashSet().Select(async i =>
-                    {
-                        try
-                        {
-                            var onliner = new Onliner(i.Token);
-                            await onliner.Connect();
-                        }
-                        catch (Exception e)
-                        {
-                            Log.Error(e, "Error while logging in");
-                            // Decide if you want to throw or just log the error.
-                            // If you throw here, one failure will result in Task.WhenAll failing.
-                            // throw;
-                        }
-                    }).ToList();
-
-                    await Task.WhenAll(tasks);
-                });
+                    toProcess.Add(i.Token);
+                }
             }
-
+            
+            Log.Information("Processing {Count} online tokens to online....", toProcess.Count);
+            _ = ProcessTokensInChunks(toProcess);
+            
             _client.Ready += ShardReady;
             await clientReady.Task.ConfigureAwait(false);
             Log.Information("Ready!");
@@ -479,6 +431,37 @@ namespace BoostBotV2
                 }
             });
             return Task.CompletedTask;
+        }
+        
+        private static async Task ProcessTokensInChunks(IEnumerable<string> tokens)
+        {
+            const int chunkSize = 500;
+            const int delayBetweenChunks = 20 * 1000; // 20 seconds
+
+            var tokenList = tokens.ToList();
+            for (var i = 0; i < tokenList.Count; i += chunkSize)
+            {
+                var currentChunk = tokenList.Skip(i).Take(chunkSize);
+
+                var tasks = currentChunk.Select(async token =>
+                {
+                    try
+                    {
+                        var onliner = new Onliner(token);
+                        await onliner.Connect();
+                    }
+                    catch (Exception e)
+                    {
+                        Log.Error(e, "Error while logging in");
+                        // Decide if you want to throw or just log the error.
+                        // If you throw here, one failure will result in Task.WhenAll failing.
+                        // throw;
+                    }
+                }).ToList();
+
+                await Task.WhenAll(tasks);
+                await Task.Delay(delayBetweenChunks);
+            }
         }
     }
 }

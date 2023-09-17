@@ -14,6 +14,7 @@
 /BoostBotV2.Api/*.zip
 *.db
 tokens.txt
+proxies.txt
 onlinetokens.txt
 *.db-shm
 *.db-wal

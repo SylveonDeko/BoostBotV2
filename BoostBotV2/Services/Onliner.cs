@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Net;
 using System.Net.WebSockets;
 using System.Text;
 using BoostBotV2.Services.Impl.Models;
@@ -20,6 +21,7 @@ public class Onliner
     private readonly TimeSpan _rateLimitPeriod = TimeSpan.FromSeconds(10);
     private readonly SemaphoreSlim _rateLimitSemaphore = new(1, 1);
     private const int MaxRetries = 5; // Define a maximum number of reconnection attempts
+    private readonly Random _proxyRandom = new();
     private const int BackoffMultiplier = 5000; // Time (in ms) to wait before attempting reconnection
 
 
@@ -27,6 +29,8 @@ public class Onliner
     private static readonly Lazy<List<SpotifySong>> Songs = new(() => JsonConvert.DeserializeObject<List<SpotifySong>>(File.ReadAllText("spotify songs.json")));
     private static readonly Lazy<List<string>> CustomStatuses = new(() => new List<string>(File.ReadAllLines("custom status.txt")));
     private static readonly Lazy<List<string>> Bios = new(() => new List<string>(File.ReadAllLines("user bios.txt")));
+    private static readonly Lazy<List<string>> Proxies = new(() => new List<string>(File.ReadAllLines("proxies.txt")));
+    private int _currentProxyIndex = 0;
 
     private readonly Random _random = new();
 
@@ -114,6 +118,12 @@ public class Onliner
             case WebSocketState.Closed:
                 try
                 {
+                    var randomProxy = Proxies.Value[_proxyRandom.Next(Proxies.Value.Count)];
+                    var proxy = new WebProxy(randomProxy);
+                    var parts = randomProxy.Split('@');
+                    var credentials = parts[0].Split(':');
+                    proxy.Credentials = new NetworkCredential(credentials[0], credentials[1]);
+                    _ws.Options.Proxy = proxy;
                     await _ws.ConnectAsync(new Uri("wss://gateway.discord.gg/?v=6&encoding=json"), CancellationToken.None);
                 }
                 catch (WebSocketException wsEx)

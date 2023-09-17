@@ -13,13 +13,14 @@
 /BoostBotV2.Api/*.db-*
 /BoostBotV2.Api/*.zip
 *.db
+tokens.txt
+onlinetokens.txt
 *.db-shm
 *.db-wal
 *.dll
 *.exe
 *.so
 *.dylib
-*.txt
 *.cache
 *.props
 *.g.cs

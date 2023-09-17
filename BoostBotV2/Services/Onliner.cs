@@ -435,14 +435,21 @@ public class Onliner
 
     private async Task SendWebSocketMessage(object payload)
     {
-        await CheckRateLimit();
-        var payloadString = JsonConvert.SerializeObject(payload);
-        await _ws.SendAsync(
-            new ArraySegment<byte>(Encoding.UTF8.GetBytes(payloadString)),
-            WebSocketMessageType.Text,
-            endOfMessage: true,
-            cancellationToken: CancellationToken.None
-        );
+        try
+        {
+            await CheckRateLimit();
+            var payloadString = JsonConvert.SerializeObject(payload);
+            await _ws.SendAsync(
+                new ArraySegment<byte>(Encoding.UTF8.GetBytes(payloadString)),
+                WebSocketMessageType.Text,
+                endOfMessage: true,
+                cancellationToken: CancellationToken.None
+            );
+        }
+        catch (Exception e)
+        {
+            Log.Error("Error sending websocket message: {0}", e.Message);
+        }
     }
 
     private string DecideActionBasedOnWeight(Dictionary<string, int> weightedChoices)

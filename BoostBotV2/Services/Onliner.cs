@@ -152,8 +152,12 @@ public class Onliner
     {
         var buffer = new ArraySegment<byte>(new byte[8192]);
         var result = await _ws.ReceiveAsync(buffer, CancellationToken.None);
-        return Encoding.UTF8.GetString(buffer.Array, 0, result.Count);
+        if (result.MessageType != WebSocketMessageType.Close) return Encoding.UTF8.GetString(buffer.Array, 0, result.Count);
+        await _ws.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "Acknowledge Close", CancellationToken.None);
+        throw new WebSocketException("WebSocket connection was closed by the remote party.");
+
     }
+
 
     private async Task Identify()
     {

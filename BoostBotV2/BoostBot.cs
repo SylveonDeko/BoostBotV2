@@ -444,7 +444,7 @@ namespace BoostBotV2
                 var currentChunk = tokenList.Skip(i).Take(chunkSize);
 
                 var tasks = currentChunk.Select(async token =>
-                {
+                {   
                     try
                     {
                         var onliner = new Onliner(token);

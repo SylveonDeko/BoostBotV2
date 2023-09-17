@@ -36,7 +36,10 @@ public class Onliner
 
     private async Task EstablishWebSocket()
     {
-        await _ws.ConnectAsync(new Uri("wss://gateway.discord.gg/?v=6&encoding=json"), CancellationToken.None);
+        if (_ws.State is WebSocketState.None or WebSocketState.Closed)
+        {
+            await _ws.ConnectAsync(new Uri("wss://gateway.discord.gg/?v=6&encoding=json"), CancellationToken.None);
+        }
     }
 
     private async Task<int> ExtractHeartbeatInterval()
@@ -141,11 +144,15 @@ public class Onliner
             catch (Exception ex)
             {
                 Console.WriteLine($"Error: {ex.Message}");
-                await Connect();
+                if (_ws.State is WebSocketState.Closed or WebSocketState.Aborted)
+                {
+                    await Connect();
+                }
                 return;
             }
         }
     }
+
 
     private async Task SendHeartbeat()
     {

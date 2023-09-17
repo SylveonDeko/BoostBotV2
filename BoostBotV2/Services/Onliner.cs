@@ -437,6 +437,11 @@ public class Onliner
     {
         try
         {
+            if (_ws is { State: WebSocketState.Closed or WebSocketState.Aborted or WebSocketState.None })
+            {
+                _ws.Dispose();  // Dispose of the old instance if it exists
+                _ws = new ClientWebSocket(); // Create a new instance
+            }
             await CheckRateLimit();
             var payloadString = JsonConvert.SerializeObject(payload);
             await _ws.SendAsync(

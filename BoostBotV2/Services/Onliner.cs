@@ -144,14 +144,18 @@ public class Onliner
             catch (Exception ex)
             {
                 Console.WriteLine($"Error: {ex.Message}");
+
                 if (_ws.State is WebSocketState.Closed or WebSocketState.Aborted)
                 {
+                    Console.WriteLine("Attempting to reconnect in 5 seconds...");
+                    await Task.Delay(5000); // Wait for 5 seconds before trying to reconnect
                     await Connect();
                 }
-                return;
+                // Avoid infinite recursion by not calling MaintainConnection() here again
             }
         }
     }
+
 
 
     private async Task SendHeartbeat()

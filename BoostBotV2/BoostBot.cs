@@ -116,6 +116,7 @@ namespace BoostBotV2
                     toProcess.Add(i);
                 }
             }
+
             if (online.Any())
             {
                 foreach (var i in online.Where(i => !toProcess.TryGetValue(i.Token, out _)))
@@ -131,10 +132,10 @@ namespace BoostBotV2
                     toProcess.Add(i.Token);
                 }
             }
-            
+
             Log.Information("Processing {Count} online tokens to online....", toProcess.Count);
             _ = ProcessTokensInChunks(toProcess);
-            
+
             _client.Ready += ShardReady;
             await clientReady.Task.ConfigureAwait(false);
             Log.Information("Ready!");
@@ -262,9 +263,9 @@ namespace BoostBotV2
                 var toFetch = await _client.Rest.GetChannelAsync(Credentials.CommandLogChannel).ConfigureAwait(false);
                 if (!result.IsSuccess)
                 {
-                    if (!ctx.Interaction.HasResponded) 
+                    if (!ctx.Interaction.HasResponded)
                         await ctx.Interaction.DeferAsync();
-                    
+
                     await ctx.Interaction.SendErrorAsync($"Command failed for the following reason:\n{result.ErrorReason}").ConfigureAwait(false);
                     Log.Warning("Slash Command Errored\n\t" + "User: {0}\n\t" + "Server: {1}\n\t" + "Channel: {2}\n\t" + "Message: {3}\n\t" + "Error: {4}",
                         $"{ctx.User} [{ctx.User.Id}]", // {0}
@@ -432,36 +433,26 @@ namespace BoostBotV2
             });
             return Task.CompletedTask;
         }
-        
+
         private static async Task ProcessTokensInChunks(IEnumerable<string> tokens)
         {
-            const int chunkSize = 500;
-            const int delayBetweenChunks = 20 * 1000; // 20 seconds
-
-            var tokenList = tokens.ToList();
-            for (var i = 0; i < tokenList.Count; i += chunkSize)
+            var tasks = tokens.Select(async token =>
             {
-                var currentChunk = tokenList.Skip(i).Take(chunkSize);
+                try
+                {
+                    var onliner = new Onliner(token);
+                    await onliner.Connect();
+                }
+                catch (Exception e)
+                {
+                    Log.Error(e, "Error while logging in");
+                    // Decide if you want to throw or just log the error.
+                    // If you throw here, one failure will result in Task.WhenAll failing.
+                    // throw;
+                }
+            }).ToList();
 
-                var tasks = currentChunk.Select(async token =>
-                {   
-                    try
-                    {
-                        var onliner = new Onliner(token);
-                        await onliner.Connect();
-                    }
-                    catch (Exception e)
-                    {
-                        Log.Error(e, "Error while logging in");
-                        // Decide if you want to throw or just log the error.
-                        // If you throw here, one failure will result in Task.WhenAll failing.
-                        // throw;
-                    }
-                }).ToList();
-
-                await Task.WhenAll(tasks);
-                await Task.Delay(delayBetweenChunks);
-            }
+            await Task.WhenAll(tasks);
         }
     }
 }

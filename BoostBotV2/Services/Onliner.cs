@@ -112,9 +112,9 @@ public class Onliner
     
     private async Task EstablishWebSocket()
     {
-        if (_ws is { State: WebSocketState.Closed or WebSocketState.Aborted or WebSocketState.None })
+        if (_ws is null or  { State: WebSocketState.Closed or WebSocketState.Aborted or WebSocketState.None })
         {
-            _ws.Dispose();  // Dispose of the old instance if it exists
+            _ws?.Dispose();  // Dispose of the old instance if it exists
             _ws = new ClientWebSocket(); // Create a new instance
         }
         switch (_ws.State)
@@ -165,6 +165,10 @@ public class Onliner
 
     private async Task<string> ReceiveWebSocketMessage()
     {
+        if (_ws?.State is null or WebSocketState.Closed or WebSocketState.Aborted or WebSocketState.None)
+        {
+            await EstablishWebSocket();
+        }
         var buffer = new ArraySegment<byte>(new byte[8192]);
         var result = await _ws.ReceiveAsync(buffer, CancellationToken.None);
         if (result.MessageType != WebSocketMessageType.Close) return Encoding.UTF8.GetString(buffer.Array, 0, result.Count);
@@ -252,7 +256,7 @@ public class Onliner
     private async Task MaintainConnection(int heartbeatInterval)
     {
         // Calculate the next time to update the status
-        DateTime nextStatusUpdateTime = DateTime.UtcNow.AddMinutes(StatusUpdateIntervalMinutes);
+        var nextStatusUpdateTime = DateTime.UtcNow.AddMinutes(StatusUpdateIntervalMinutes);
 
         while (true)
         {
@@ -437,9 +441,9 @@ public class Onliner
     {
         try
         {
-            if (_ws is { State: WebSocketState.Closed or WebSocketState.Aborted or WebSocketState.None })
+            if (_ws is null or { State: WebSocketState.Closed or WebSocketState.Aborted or WebSocketState.None })
             {
-                _ws.Dispose();  // Dispose of the old instance if it exists
+                _ws?.Dispose();  // Dispose of the old instance if it exists
                 _ws = new ClientWebSocket(); // Create a new instance
             }
             await CheckRateLimit();

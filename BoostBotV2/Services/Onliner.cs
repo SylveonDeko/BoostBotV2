@@ -18,6 +18,9 @@ public class Onliner
     private readonly int _maxRequests = 10;
     private readonly TimeSpan _rateLimitPeriod = TimeSpan.FromSeconds(10);
     private readonly SemaphoreSlim _rateLimitSemaphore = new(1, 1);
+    private const int MaxRetries = 5; // Define a maximum number of reconnection attempts
+    private const int BackoffMultiplier = 5000; // Time (in ms) to wait before attempting reconnection
+
 
 
     private static readonly Lazy<List<SpotifySong>> Songs = new(() => JsonConvert.DeserializeObject<List<SpotifySong>>(File.ReadAllText("spotify songs.json")));
@@ -33,13 +36,40 @@ public class Onliner
         _config = JsonConvert.DeserializeObject<OnlinerConfig>(File.ReadAllText("config.json"));
     }
 
+   
     public async Task Connect()
     {
-        await EstablishWebSocket();
-        var heartbeatInterval = await ExtractHeartbeatInterval();
-        await Identify();
-        await HandleVoiceConnection();
-        await MaintainConnection(heartbeatInterval);
+        var retryCount = 0;
+        while (retryCount < MaxRetries)
+        {
+            try
+            {
+                await EstablishWebSocket();
+                var heartbeatInterval = await ExtractHeartbeatInterval();
+                await Identify();
+                await HandleVoiceConnection();
+                await MaintainConnection(heartbeatInterval);
+                
+                // If everything is fine, break out of the loop
+                break;
+            }
+            catch (Exception ex)
+            {
+                retryCount++;
+                Log.Error($"Error on connection attempt {retryCount}: {ex.Message}");
+
+                if (retryCount >= MaxRetries)
+                {
+                    Log.Fatal("Max retries reached. Throwing exception...");
+                    throw;
+                }
+
+                // Wait with exponential backoff
+                var backoffTime = BackoffMultiplier * retryCount;
+                Log.Information($"Waiting for {backoffTime}ms before retrying...");
+                await Task.Delay(backoffTime);
+            }
+        }
     }
 
     private async Task CheckRateLimit()
@@ -77,20 +107,36 @@ public class Onliner
     
     private async Task EstablishWebSocket()
     {
-        if (_ws.State is WebSocketState.None or WebSocketState.Closed)
+        switch (_ws.State)
         {
-            try
-            {
-                await _ws.ConnectAsync(new Uri("wss://gateway.discord.gg/?v=6&encoding=json"), CancellationToken.None);
-            }
-            catch(Exception ex)
-            {
-                Console.WriteLine($"WebSocket connection error: {ex.Message}");
-            }
-        }
-        else
-        {
-            Console.WriteLine($"WebSocket is already in state: {_ws.State}");
+            case WebSocketState.None:
+            case WebSocketState.Closed:
+                try
+                {
+                    await _ws.ConnectAsync(new Uri("wss://gateway.discord.gg/?v=6&encoding=json"), CancellationToken.None);
+                }
+                catch (WebSocketException wsEx)
+                {
+                    Log.Error($"WebSocket exception: {wsEx.Message}");
+                }
+                catch (TimeoutException te)
+                {
+                    Log.Error($"Timeout exception: {te.Message}");
+                }
+                catch (Exception ex)
+                {
+                    Log.Error($"An unknown error occurred: {ex.Message}");
+                }
+                break;
+            
+            case WebSocketState.CloseReceived:
+                Log.Warning("WebSocket is in CloseReceived state. Attempting to close properly...");
+                await _ws.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
+                break;
+            
+            default:
+                Log.Warning($"WebSocket is already in state: {_ws.State}");
+                break;
         }
     }
 
@@ -195,12 +241,11 @@ public class Onliner
             }
             catch (Exception ex)
             {
-                Log.Error($"Error: {ex.Message}");
+                Log.Error($"Error during MaintainConnection: {ex.Message}");
 
-                if (_ws.State is WebSocketState.Closed or WebSocketState.Aborted)
+                if (_ws.State is WebSocketState.Closed or WebSocketState.Aborted or WebSocketState.CloseReceived)
                 {
-                    Log.Information("Attempting to reconnect in 5 seconds...");
-                    await Task.Delay(5000); // Wait for 5 seconds before trying to reconnect
+                    Log.Information("WebSocket is not in an active state. Attempting to reconnect...");
                     await Connect();
                 }
                 else
@@ -234,7 +279,7 @@ public class Onliner
             { "visual_studio", _config.status.visual_studio }
         });
 
-        List<object> activities = new List<object>();
+        var activities = new List<object>();
 
         switch (type)
         {

@@ -5,9 +5,9 @@ using Figgle;
 var pid = Environment.ProcessId;
 
 Console.WriteLine(
-    FiggleFonts.Ogre.Render("BoostBot V3"));
+    FiggleFonts.Ogre.Render("DekAIO V3"));
 
-LogSetup.SetupLogger("BoostBotV3");
+LogSetup.SetupLogger("DekAIO V3");
 Log.Information($"Pid: {pid}");
 
 await new Bot().RunAndBlockAsync();

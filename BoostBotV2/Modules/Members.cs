@@ -58,7 +58,6 @@ public partial class Members : BoostModuleBase
             if (!await GetAgreedRules(uow, _credentials))
                 return;
             var registry = await uow.MemberFarmRegistry.FirstOrDefaultAsync(x => x.GuildId == guildId);
-            var registeredCount = await uow.MemberFarmRegistry.CountAsync(x => x.UserId == Context.User.Id);
 
             if (uow.Blacklists.Select(x => x.BlacklistId).Contains(guildId))
             {
@@ -420,8 +419,10 @@ public partial class Members : BoostModuleBase
     [IsCommandGuild]
     public async Task Stock()
     {
+        await using var uow = _db.GetDbContext();
         var privateOfflineStock = await _discordAuthService.GetPrivateStock(Context.User.Id);
         var privateOnlineStock = await _discordAuthService.GetPrivateStock(Context.User.Id, true);
+        var keepOnlineStock = await uow.KeepOnline.CountAsync(x => x.UserId == Context.User.Id);
         var nitroStock = _discordAuthService.GetBoostTokens(Context.User.Id);
         var file = await File.ReadAllLinesAsync("tokens.txt");
         var onlineFile = await File.ReadAllLinesAsync("onlinetokens.txt");
@@ -429,6 +430,7 @@ public partial class Members : BoostModuleBase
             .WithColor(Color.Green)
             .AddField("Regular Stock", $"**Regular Members:** {file.Length}\n**Online Members:** {onlineFile.Length}")
             .AddField("Private Stock", $"**Regular Members:** {privateOfflineStock?.Count ?? 0}\n**Online Members:** {privateOnlineStock?.Count ?? 0}\n**Boost:** {nitroStock.Count}")
+            .AddField("Keep Online", $"**Members:** {keepOnlineStock}")
             .Build();
 
         await ReplyAsync(embed: embed);
@@ -739,6 +741,54 @@ public partial class Members : BoostModuleBase
         {
             Log.Error("Error adding members: {Error}", e);
         }
+    }
+
+    [Command("addkeeponline")]
+    [IsPremium]
+    [IsCommandGuild]
+    [RateLimit(200)]
+    public async Task AddKeepOnline()
+    {
+        var attachment = Context.Message.Attachments.FirstOrDefault();
+        if (attachment == null)
+        {
+            await Context.Channel.SendErrorAsync("No attachment found.");
+            return;
+        }
+        
+        if (attachment.Filename.Split('.').LastOrDefault() != "txt")
+        {
+            await Context.Channel.SendErrorAsync("Invalid file type.");
+            return;
+        }
+        
+        var file = await _client.GetStringAsync(attachment.Url);
+        var fileSplit = file.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+
+        foreach (var x in fileSplit)
+        {
+            if (MyRegex().IsMatch(x)) continue;
+            Log.Information(x);
+            await Context.Channel.SendErrorAsync("One or mode invalid members found.");
+            return;
+        }
+        
+        await using var uow = _db.GetDbContext();
+        if (!await GetAgreedRules(uow, _credentials))
+            return;
+        
+        var toAdd = fileSplit.ToHashSet();
+        var current = uow.KeepOnline.Where(x => x.UserId == Context.User.Id).Select(x => x.Token).ToHashSet();
+        var fixedToAdd = toAdd.Except(current);
+        if (!fixedToAdd.Any())
+        {
+            await Context.Channel.SendErrorAsync("No new tokens to add.");
+            return;
+        }
+        uow.KeepOnline.AddRange(fixedToAdd.Select(x => new KeepOnline {UserId = Context.User.Id, Token = x}));
+        await uow.SaveChangesAsync();
+        await Context.Channel.SendConfirmAsync($"Added {fixedToAdd.Count()} tokens to your keep online list.");
+
     }
 
     public enum StockEnum

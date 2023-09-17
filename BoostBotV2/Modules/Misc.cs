@@ -231,7 +231,7 @@ public class Misc : BoostModuleBase
     {
         await using var uow = _db.GetDbContext();
         var eb = new EmbedBuilder()
-            .WithAuthor("BoostBot v3", _client.CurrentUser.GetAvatarUrl(), "https://discord.gg/edotbaby")
+            .WithAuthor("DekAIO v3", _client.CurrentUser.GetAvatarUrl(), "https://discord.gg/dekoshop")
             .AddField("Author", "<@967038397715709962>")
             .AddField("Owners", string.Join("\n", _creds.Owners.Select(x => $"<@{x}>")))
             .AddField("Guilds", _client.Guilds.Count)

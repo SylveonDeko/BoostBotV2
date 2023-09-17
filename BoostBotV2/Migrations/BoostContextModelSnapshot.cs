@@ -57,6 +57,27 @@ namespace BoostBotV2.Migrations
                     b.ToTable("GuildsAdded");
                 });
 
+            modelBuilder.Entity("BoostBotV2.Db.Models.KeepOnline", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<ulong>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("KeepOnline");
+                });
+
             modelBuilder.Entity("BoostBotV2.Db.Models.Keys", b =>
                 {
                     b.Property<int>("Id")

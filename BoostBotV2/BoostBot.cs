@@ -95,6 +95,31 @@ namespace BoostBotV2
                 throw;
             }
 
+            _ = Task.Run(async () =>
+            {
+                if (OnlineTokens.Any())
+                {
+                    Log.Information("Onlining Normal Online Tokens");
+                    var tasks = OnlineTokens.Select(async i =>
+                    {
+                        try
+                        {
+                            var onliner = new Onliner(i);
+                            await onliner.Connect();
+                        }
+                        catch (Exception e)
+                        {
+                            Log.Error(e, "Error while logging in");
+                            // Decide if you want to throw or just log the error.
+                            // If you throw here, one failure will result in Task.WhenAll failing.
+                            // throw;
+                        }
+                    }).ToList();
+
+                    await Task.WhenAll(tasks);
+                }
+            });
+
             Log.Information("Loading services...");
             try
             {
@@ -104,6 +129,58 @@ namespace BoostBotV2
             {
                 Log.Error("Error while loading services\n{0}", e);
                 throw;
+            }
+
+            var toOnline = _db.GetDbContext();
+            var online = toOnline.PrivateStock.Where(x => x.IsOnline).ToHashSet();
+            if (online.Any())
+            {
+                _ = Task.Run(async () =>
+                {
+                    Log.Information("Onlining Private Stock Tokens");
+                    var tasks = online.Select(async i =>
+                    {
+                        try
+                        {
+                            var onliner = new Onliner(i.Token);
+                            await onliner.Connect();
+                        }
+                        catch (Exception e)
+                        {
+                            Log.Error(e, "Error while logging in");
+                            // Decide if you want to throw or just log the error.
+                            // If you throw here, one failure will result in Task.WhenAll failing.
+                            // throw;
+                        }
+                    }).ToList();
+
+                    await Task.WhenAll(tasks);
+                });
+            }
+
+            if (toOnline.KeepOnline.Any())
+            {
+                _ = Task.Run(async () =>
+                {
+                    Log.Information("Onlining KeepOnline Tokens");
+                    var tasks = toOnline.KeepOnline.ToHashSet().Select(async i =>
+                    {
+                        try
+                        {
+                            var onliner = new Onliner(i.Token);
+                            await onliner.Connect();
+                        }
+                        catch (Exception e)
+                        {
+                            Log.Error(e, "Error while logging in");
+                            // Decide if you want to throw or just log the error.
+                            // If you throw here, one failure will result in Task.WhenAll failing.
+                            // throw;
+                        }
+                    }).ToList();
+
+                    await Task.WhenAll(tasks);
+                });
             }
 
             _client.Ready += ShardReady;
@@ -132,7 +209,7 @@ namespace BoostBotV2
 #else
                 await service.RegisterCommandsGloballyAsync(true);
 #endif
-                
+
                 _client.InteractionCreated += HandleInteractionAsync;
                 Tokens = (await File.ReadAllLinesAsync("tokens.txt")).ToHashSet();
                 OnlineTokens = (await File.ReadAllLinesAsync("onlinetokens.txt")).ToHashSet();
@@ -233,6 +310,9 @@ namespace BoostBotV2
                 var toFetch = await _client.Rest.GetChannelAsync(Credentials.CommandLogChannel).ConfigureAwait(false);
                 if (!result.IsSuccess)
                 {
+                    if (!ctx.Interaction.HasResponded) 
+                        await ctx.Interaction.DeferAsync();
+                    
                     await ctx.Interaction.SendErrorAsync($"Command failed for the following reason:\n{result.ErrorReason}").ConfigureAwait(false);
                     Log.Warning("Slash Command Errored\n\t" + "User: {0}\n\t" + "Server: {1}\n\t" + "Channel: {2}\n\t" + "Message: {3}\n\t" + "Error: {4}",
                         $"{ctx.User} [{ctx.User.Id}]", // {0}

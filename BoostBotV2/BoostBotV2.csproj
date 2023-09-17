@@ -22,6 +22,7 @@
       <PackageReference Include="Serilog" Version="3.0.2-dev-02044" />
       <PackageReference Include="Serilog.Sinks.Console" Version="4.2.0-dev-00918" />
       <PackageReference Include="StackExchange.Redis" Version="2.6.122" />
+      <PackageReference Include="WebSocketSharp" Version="1.0.3-rc11" />
       <PackageReference Include="YamlDotNet" Version="13.1.1" />
     </ItemGroup>
 
@@ -30,7 +31,7 @@
           <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
         <None Update="onlinetokens.txt">
-          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
         <None Update="BoostBot.db">
           <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -42,6 +43,18 @@
           <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
         <None Update="creds.yml">
+          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+        <None Update="config.json">
+          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+        <None Update="custom status.txt">
+          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+        <None Update="spotify songs.json">
+          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+        <None Update="user bios.txt">
           <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
     </ItemGroup>

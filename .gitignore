@@ -12,7 +12,6 @@
 /BoostBotV2.Api/*.db
 /BoostBotV2.Api/*.db-*
 /BoostBotV2.Api/*.zip
-*.json
 *.db
 *.db-shm
 *.db-wal
@@ -26,3 +25,6 @@
 *.g.cs
 *.info
 *.zip
+appsettings.json
+launchSettings.json
+appsettings.Development.json

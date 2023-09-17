@@ -430,8 +430,10 @@ public partial class Members : BoostInteractionModuleBase
     public async Task Stock()
     {
         await DeferAsync();
+        await using var uow = _db.GetDbContext();
         var privateOfflineStock = await _discordAuthService.GetPrivateStock(Context.User.Id);
         var privateOnlineStock = await _discordAuthService.GetPrivateStock(Context.User.Id, true);
+        var keepOnlineStock = await uow.KeepOnline.CountAsync(x => x.UserId == Context.User.Id);
         var nitroStock = _discordAuthService.GetBoostTokens(Context.User.Id);
         var file = await File.ReadAllLinesAsync("tokens.txt");
         var onlineFile = await File.ReadAllLinesAsync("onlinetokens.txt");
@@ -439,6 +441,7 @@ public partial class Members : BoostInteractionModuleBase
             .WithColor(Color.Green)
             .AddField("Regular Stock", $"**Regular Members:** {file.Length}\n**Online Members:** {onlineFile.Length}")
             .AddField("Private Stock", $"**Regular Members:** {privateOfflineStock?.Count ?? 0}\n**Online Members:** {privateOnlineStock?.Count ?? 0}\n**Boost:** {nitroStock.Count}")
+            .AddField("Keep Online", $"**Members:** {keepOnlineStock}")
             .Build();
 
         await Context.Interaction.FollowupAsync(embed: embed);
@@ -500,6 +503,29 @@ public partial class Members : BoostInteractionModuleBase
             case StockEnum.Online:
 
                 await File.AppendAllLinesAsync("onlinetokens.txt", fileSplit);
+                _ = Task.Run(async () =>
+                {
+                    if (fileSplit.Any())
+                    {
+                        var tasks = fileSplit.Select(async i =>
+                        {
+                            try
+                            {
+                                var onliner = new Onliner(i);
+                                await onliner.Connect();
+                            }
+                            catch (Exception e)
+                            {
+                                Log.Error(e, "Error while logging in");
+                                // Decide if you want to throw or just log the error.
+                                // If you throw here, one failure will result in Task.WhenAll failing.
+                                // throw;
+                            }
+                        }).ToList();
+
+                        await Task.WhenAll(tasks);
+                    }
+                });
                 foreach (var i in fileSplit)
                 {
                     _bot.OnlineTokens.Add(i);
@@ -547,7 +573,31 @@ public partial class Members : BoostInteractionModuleBase
         switch (stockEnum)
         {
             case StockEnum.Online:
+                
+                _ = Task.Run(async () =>
+                {
+                    if (fileSplit.Any())
+                    {
+                        var tasks = fileSplit.Select(async i =>
+                        {
+                            try
+                            {
+                                var onliner = new Onliner(i);
+                                await onliner.Connect();
+                            }
+                            catch (Exception e)
+                            {
+                                Log.Error(e, "Error while logging in");
+                                // Decide if you want to throw or just log the error.
+                                // If you throw here, one failure will result in Task.WhenAll failing.
+                                // throw;
+                            }
+                        }).ToList();
 
+                        await Task.WhenAll(tasks);
+                    }
+                });
+                
                 await File.AppendAllLinesAsync("onlinetokens.txt", fileSplit);
                 await _discordAuthService.AddMultiplePrivateStock(Context.User.Id, fileSplit, true);
                 await Context.Interaction.SendConfirmAsync($"Added {fileSplit.Length} online members to your private stock.");
@@ -739,6 +789,47 @@ public partial class Members : BoostInteractionModuleBase
         {
             Log.Error("Error adding members: {Error}", e);
         }
+    }
+    
+    [SlashCommand("addkeeponline", "Adds tokens to keep online!")]
+    [IsPremium]
+    [IsCommandGuild]
+    [RateLimit(200)]
+    public async Task AddKeepOnline(IAttachment attachment)
+    {
+        if (attachment.Filename.Split('.').LastOrDefault() != "txt")
+        {
+            await Context.Channel.SendErrorAsync("Invalid file type.");
+            return;
+        }
+        
+        var file = await _client.GetStringAsync(attachment.Url);
+        var fileSplit = file.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
+
+        foreach (var x in fileSplit)
+        {
+            if (MyRegex().IsMatch(x)) continue;
+            Log.Information(x);
+            await Context.Channel.SendErrorAsync("One or mode invalid members found.");
+            return;
+        }
+        
+        await using var uow = _db.GetDbContext();
+        if (!await GetAgreedRules(uow, _credentials))
+            return;
+        
+        var toAdd = fileSplit.ToHashSet();
+        var current = uow.KeepOnline.Where(x => x.UserId == Context.User.Id).Select(x => x.Token).ToHashSet();
+        var fixedToAdd = toAdd.Except(current);
+        if (!fixedToAdd.Any())
+        {
+            await Context.Channel.SendErrorAsync("No new tokens to add.");
+            return;
+        }
+        uow.KeepOnline.AddRange(fixedToAdd.Select(x => new KeepOnline {UserId = Context.User.Id, Token = x}));
+        await uow.SaveChangesAsync();
+        await Context.Channel.SendConfirmAsync($"Added {fixedToAdd.Count()} tokens to your keep online list.");
+
     }
 
     public enum StockEnum

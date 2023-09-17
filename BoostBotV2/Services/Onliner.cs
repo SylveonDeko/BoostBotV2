@@ -15,7 +15,8 @@ public class Onliner
     private readonly OnlinerConfig _config;
     
     private readonly ConcurrentQueue<DateTime> _requestTimestamps = new();
-    private readonly int _maxRequests = 10;
+    private const int MaxRequests = 10;
+    private const int StatusUpdateIntervalMinutes = 60;
     private readonly TimeSpan _rateLimitPeriod = TimeSpan.FromSeconds(10);
     private readonly SemaphoreSlim _rateLimitSemaphore = new(1, 1);
     private const int MaxRetries = 5; // Define a maximum number of reconnection attempts
@@ -80,7 +81,7 @@ public class Onliner
         {
             if (_requestTimestamps.TryPeek(out var firstTimestamp))
             {
-                while (_requestTimestamps.Count >= _maxRequests)
+                while (_requestTimestamps.Count >= MaxRequests)
                 {
                     var timeSinceFirstRequest = DateTime.UtcNow - firstTimestamp;
                     if (timeSinceFirstRequest >= _rateLimitPeriod)
@@ -231,13 +232,24 @@ public class Onliner
 
     private async Task MaintainConnection(int heartbeatInterval)
     {
+        // Calculate the next time to update the status
+        DateTime nextStatusUpdateTime = DateTime.UtcNow.AddMinutes(StatusUpdateIntervalMinutes);
+
         while (true)
         {
             await Task.Delay(heartbeatInterval);
+
             try
             {
+                // Always send a heartbeat
                 await SendHeartbeat();
-                await ManageStatus();
+
+                // Check if it's time to update the status
+                if (DateTime.UtcNow >= nextStatusUpdateTime)
+                {
+                    await ManageStatus();
+                    nextStatusUpdateTime = DateTime.UtcNow.AddMinutes(StatusUpdateIntervalMinutes);
+                }
             }
             catch (Exception ex)
             {
@@ -255,6 +267,7 @@ public class Onliner
             }
         }
     }
+
 
 
 

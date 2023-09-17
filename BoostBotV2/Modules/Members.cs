@@ -744,6 +744,8 @@ public partial class Members : BoostModuleBase
     }
 
     [Command("addkeeponline")]
+    [Summary("Adds members to your keep online list. The bot keeps them online while its on.")]
+    [Usage("addkeeponline <attachment>")]
     [IsPremium]
     [IsCommandGuild]
     [RateLimit(200)]

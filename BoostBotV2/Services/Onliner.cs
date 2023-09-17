@@ -12,7 +12,7 @@ namespace BoostBotV2.Services;
 public class Onliner
 {
     private readonly string _token;
-    private ClientWebSocket _ws;
+    private ClientWebSocket? _ws;
     private readonly OnlinerConfig _config;
     
     private readonly ConcurrentQueue<DateTime> _requestTimestamps = new();
@@ -112,9 +112,10 @@ public class Onliner
     
     private async Task EstablishWebSocket()
     {
-        if (_ws.State is WebSocketState.Closed or WebSocketState.Aborted or WebSocketState.None)
+        if (_ws is { State: WebSocketState.Closed or WebSocketState.Aborted or WebSocketState.None })
         {
-            _ws = new ClientWebSocket();
+            _ws.Dispose();  // Dispose of the old instance if it exists
+            _ws = new ClientWebSocket(); // Create a new instance
         }
         switch (_ws.State)
         {

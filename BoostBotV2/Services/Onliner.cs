@@ -12,7 +12,7 @@ namespace BoostBotV2.Services;
 public class Onliner
 {
     private readonly string _token;
-    private readonly ClientWebSocket _ws;
+    private ClientWebSocket _ws;
     private readonly OnlinerConfig _config;
     
     private readonly ConcurrentQueue<DateTime> _requestTimestamps = new();
@@ -112,6 +112,10 @@ public class Onliner
     
     private async Task EstablishWebSocket()
     {
+        if (_ws.State is WebSocketState.Closed or WebSocketState.Aborted or WebSocketState.None)
+        {
+            _ws = new ClientWebSocket();
+        }
         switch (_ws.State)
         {
             case WebSocketState.None:

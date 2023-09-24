@@ -355,7 +355,7 @@ public class Onliner
                         start = DateTime.UtcNow.Ticks,
                         end = DateTime.UtcNow.AddMilliseconds(song.Track.DurationMs).Ticks
                     },
-                    party = new { id = "spotify:" + Guid.NewGuid().ToString() },
+                    party = new { id = "spotify:" + Guid.NewGuid() },
                     sync_id = song.Track.ExternalUrls.Spotify.Split("https://open.spotify.com/track/")[1],
                     flags = 48,
                     metadata = new
@@ -458,6 +458,8 @@ public class Onliner
         catch (Exception e)
         {
             Log.Error("Error sending websocket message: {0}", e.Message);
+            _ws?.Dispose();
+            await Connect();
         }
     }
 

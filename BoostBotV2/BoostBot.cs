@@ -134,7 +134,7 @@ namespace BoostBotV2
             }
 
             Log.Information("Processing {Count} online tokens to online....", toProcess.Count);
-            _ = ProcessTokensInChunks(toProcess);
+            _ = Task.Run(async () => await ProcessTokensInChunks(toProcess).ConfigureAwait(false));
 
             _client.Ready += ShardReady;
             await clientReady.Task.ConfigureAwait(false);

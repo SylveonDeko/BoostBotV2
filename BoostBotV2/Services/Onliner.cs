@@ -459,6 +459,7 @@ public class Onliner
         {
             Log.Error("Error sending websocket message: {0}", e.Message);
             _ws?.Dispose();
+            _ws = new ClientWebSocket();
             await Connect();
         }
     }

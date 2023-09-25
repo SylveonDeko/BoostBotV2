@@ -38,6 +38,7 @@ public class OwnerOnly : BoostInteractionModuleBase
         var actualGuilds = _client.Guilds;
         foreach (var i in actualGuilds)
         {
+            if (i.Id == _creds.CommandGuild) continue;
             if (!guilds.Select(x => x.GuildId).Contains(i.Id))
                 toLeave.Add(i);
         }

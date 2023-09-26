@@ -156,11 +156,16 @@ public partial class Members : BoostInteractionModuleBase
                                          $"\nYou can increase the limit by buying plans.")
                         .WithColor(Color.Red);
 
-                    var button = new ComponentBuilder()
-                        .WithButton("Store Link", url: _credentials.StoreLink, style: ButtonStyle.Link);
-
-                    await Context.Interaction.FollowupAsync(embed: promoteEb.Build(), components: button.Build());
-                    return;
+                   if (_credentials.StoreLink != null)
+                    {
+                        var button = new ComponentBuilder()
+                            .WithButton("Store Link", url: _credentials.StoreLink, style: ButtonStyle.Link);
+                        await Context.Interaction.FollowupAsync(embed: promoteEb.Build(), components: button.Build());
+                    }
+                    else
+                    {
+                        await Context.Interaction.FollowupAsync(embed: promoteEb.Build());
+                    } return;
                 }
 
                 numTokens = Math.Min(numTokens, getAllowedAddCount.Value);
@@ -351,11 +356,16 @@ public partial class Members : BoostInteractionModuleBase
                                          $"\nYou can increase the limit by buying plans.")
                         .WithColor(Color.Red);
 
-                    var button = new ComponentBuilder()
-                        .WithButton("Store Link", url: _credentials.StoreLink, style: ButtonStyle.Link);
-
-                    await Context.Interaction.FollowupAsync(embed: promoteEb.Build(), components: button.Build());
-                    return;
+                    if (_credentials.StoreLink != null)
+                    {
+                        var button = new ComponentBuilder()
+                            .WithButton("Store Link", url: _credentials.StoreLink, style: ButtonStyle.Link);
+                        await Context.Interaction.FollowupAsync(embed: promoteEb.Build(), components: button.Build());
+                    }
+                    else
+                    {
+                        await Context.Interaction.FollowupAsync(embed: promoteEb.Build());
+                    } return;
                 }
 
                 numTokens = Math.Min(numTokens, getAllowedAddCount.Value);

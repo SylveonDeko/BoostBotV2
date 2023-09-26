@@ -34,7 +34,8 @@ public class OwnerOnly : BoostModuleBase
             {
                 Author = user,
                 Content = command,
-                Channel = Context.Channel
+                Channel = Context.Channel,
+                Source = MessageSource.User
             };
             await _bot.HandleCommandAsync(msg);
         }

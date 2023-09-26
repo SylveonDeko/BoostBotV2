@@ -151,11 +151,16 @@ public partial class Members : BoostModuleBase
                                          $"\nYou can increase the limit by buying plans.")
                         .WithColor(Color.Red);
 
-                    var button = new ComponentBuilder()
-                        .WithButton("Store Link", url: _credentials.StoreLink, style: ButtonStyle.Link);
-
-                    await Context.Message.ReplyAsync(embed: promoteEb.Build(), components: button.Build());
-                    return;
+                    if (_credentials.StoreLink != null)
+                    {
+                        var button = new ComponentBuilder()
+                            .WithButton("Store Link", url: _credentials.StoreLink, style: ButtonStyle.Link);
+                        await Context.Message.ReplyAsync(embed: promoteEb.Build(), components: button.Build());
+                    }
+                    else
+                    {
+                        await Context.Message.ReplyAsync(embed: promoteEb.Build());
+                    } return;
                 }
 
                 numTokens = Math.Min(numTokens, getAllowedAddCount.Value);
@@ -349,11 +354,16 @@ public partial class Members : BoostModuleBase
                                          $"\nYou can increase the limit by buying plans.")
                         .WithColor(Color.Red);
 
-                    var button = new ComponentBuilder()
-                        .WithButton("Store Link", url: _credentials.StoreLink, style: ButtonStyle.Link);
-
-                    await Context.Message.ReplyAsync(embed: promoteEb.Build(), components: button.Build());
-                    return;
+                    if (_credentials.StoreLink != null)
+                    {
+                        var button = new ComponentBuilder()
+                            .WithButton("Store Link", url: _credentials.StoreLink, style: ButtonStyle.Link);
+                        await Context.Message.ReplyAsync(embed: promoteEb.Build(), components: button.Build());
+                    }
+                    else
+                    {
+                        await Context.Message.ReplyAsync(embed: promoteEb.Build());
+                    } return;
                 }
 
                 numTokens = Math.Min(numTokens, getAllowedAddCount.Value);

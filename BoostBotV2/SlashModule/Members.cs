@@ -104,12 +104,18 @@ public partial class Members : BoostInteractionModuleBase
                 await Context.Interaction.FollowupAsync(embed: embed, components: button.Build());
                 return;
             }
+            
 
             var authorInGuild = await guild.GetUserAsync(Context.User.Id);
             if (authorInGuild == null)
             {
                 await Context.Channel.SendErrorAsync("You must be in the specified server to use this command.");
                 return;
+            }
+
+            if (!authorInGuild.JoinedAt.HasValue)
+            {
+                await Context.Channel.SendErrorAsync("I can't determine your join date.");
             }
 
             var timeSinceJoin = DateTime.UtcNow - authorInGuild.JoinedAt.Value.UtcDateTime;

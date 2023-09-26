@@ -159,15 +159,17 @@ public class Onliner
     private async Task<int> ExtractHeartbeatInterval()
     {
         var response = await ReceiveWebSocketMessage();
+        if (response is null) return 0;
         var data = JObject.Parse(response);
         return data["d"]["heartbeat_interval"].Value<int>();
     }
 
-    private async Task<string> ReceiveWebSocketMessage()
+    private async Task<string?> ReceiveWebSocketMessage()
     {
         if (_ws?.State is null or WebSocketState.Closed or WebSocketState.Aborted or WebSocketState.None)
         {
             await EstablishWebSocket();
+            return null;
         }
         var buffer = new ArraySegment<byte>(new byte[8192]);
         var result = await _ws.ReceiveAsync(buffer, CancellationToken.None);

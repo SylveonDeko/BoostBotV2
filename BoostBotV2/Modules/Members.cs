@@ -105,13 +105,21 @@ public partial class Members : BoostModuleBase
                 return;
             }
 
-            var timeSinceJoin = DateTime.UtcNow - authorInGuild.JoinedAt.Value.UtcDateTime;
-            var timeSinceGuildCreation = DateTime.UtcNow - guild.CreatedAt.UtcDateTime;
-
-            if (timeSinceJoin.TotalHours > timeSinceGuildCreation.TotalHours + 3)
+            if (guild.OwnerId != Context.User.Id)
             {
-                await Context.Message.ReplyErrorAsync("You joined the server too late after its creation, so you can't use this command for this server.");
-                return;
+                if (!authorInGuild.JoinedAt.HasValue)
+                {
+                    await Context.Message.ReplyErrorAsync("I'm unable to detrermine when you joined the specified server. Have someone else try.");
+                    return;
+                }
+                var timeSinceJoin = DateTime.UtcNow - authorInGuild.JoinedAt.Value.UtcDateTime;
+                var timeSinceGuildCreation = DateTime.UtcNow - guild.CreatedAt.UtcDateTime;
+
+                if (timeSinceJoin.TotalHours > timeSinceGuildCreation.TotalHours + 3)
+                {
+                    await Context.Message.ReplyErrorAsync("You joined the server too late after its creation, so you can't use this command for this server.");
+                    return;
+                }
             }
             
             var curUser = await guild.GetUserAsync(Context.Client.CurrentUser.Id);
@@ -291,13 +299,21 @@ public partial class Members : BoostModuleBase
                 return;
             }
 
-            var timeSinceJoin = DateTime.UtcNow - authorInGuild.JoinedAt.Value.UtcDateTime;
-            var timeSinceGuildCreation = DateTime.UtcNow - guild.CreatedAt.UtcDateTime;
-
-            if (timeSinceJoin.TotalHours > timeSinceGuildCreation.TotalHours + 2) // +1 to ensure they joined a day or more after the server's creation
+            if (guild.OwnerId != Context.User.Id)
             {
-                await Context.Message.ReplyErrorAsync("You joined the server too late after the server was created. You cannot use this command.");
-                return;
+                if (!authorInGuild.JoinedAt.HasValue)
+                {
+                    await Context.Message.ReplyErrorAsync("I'm unable to detrermine when you joined the specified server. Have someone else try.");
+                    return;
+                }
+                var timeSinceJoin = DateTime.UtcNow - authorInGuild.JoinedAt.Value.UtcDateTime;
+                var timeSinceGuildCreation = DateTime.UtcNow - guild.CreatedAt.UtcDateTime;
+
+                if (timeSinceJoin.TotalHours > timeSinceGuildCreation.TotalHours + 3)
+                {
+                    await Context.Message.ReplyErrorAsync("You joined the server too late after its creation, so you can't use this command for this server.");
+                    return;
+                }
             }
             var curUser = await guild.GetUserAsync(Context.Client.CurrentUser.Id);
             if (curUser is null)

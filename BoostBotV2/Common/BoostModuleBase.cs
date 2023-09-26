@@ -147,7 +147,7 @@ public class BoostModuleBase : ModuleBase
         var componentBuilder = new ComponentBuilder();
         foreach (var key in shuffledKeys)
         {
-            componentBuilder.WithButton(key, buttonRules[key]);
+            componentBuilder.WithButton(key, customId: buttonRules[key]);
         }
 
         var msg = await Context.Message.ReplyAsync(embed: eb2.Build(), components: componentBuilder.Build());

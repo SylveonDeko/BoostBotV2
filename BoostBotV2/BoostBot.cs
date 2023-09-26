@@ -310,7 +310,7 @@ namespace BoostBotV2
             return Task.CompletedTask;
         }
 
-        private Task HandleCommandAsync(SocketMessage messageParam)
+        public Task HandleCommandAsync(IMessage messageParam)
         {
             _ = Task.Run(async () =>
             {

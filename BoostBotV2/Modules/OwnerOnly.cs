@@ -12,11 +12,36 @@ public class OwnerOnly : BoostModuleBase
 {
     private readonly Credentials _creds;
     private readonly DbService _db;
+    private readonly Bot _bot;
 
-    public OwnerOnly(Credentials creds, DbService db)
+    public OwnerOnly(Credentials creds, DbService db, Bot bot)
     {
         _creds = creds;
         _db = db;
+        _bot = bot;
+    }
+    
+    [Command("sudo")]
+    [Summary("Runs a command as another user.")]
+    [Usage("sudo <user> <command anmd args>")]
+    [IsOwner]
+    public async Task Sudo(IUser user, [Remainder] string command)
+    {
+        try
+        {
+            await Context.Channel.SendConfirmAsync("Running command...");
+            var msg = new AIOMessage
+            {
+                Author = user,
+                Content = command,
+                Channel = Context.Channel
+            };
+            await _bot.HandleCommandAsync(msg);
+        }
+        catch (Exception ex)
+        {
+            await Context.Channel.SendErrorAsync($"Error running command.\n{ex}");
+        }
     }
 
     [Command("setlogchannel")]

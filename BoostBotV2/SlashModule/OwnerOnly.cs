@@ -18,13 +18,37 @@ public class OwnerOnly : BoostInteractionModuleBase
     private readonly DbService _db;
     private readonly DiscordSocketClient _client;
     private readonly InteractiveService _interactive;
+    private readonly Bot bot;
 
-    public OwnerOnly(Credentials creds, DbService db, DiscordSocketClient client, InteractiveService interactive)
+    public OwnerOnly(Credentials creds, DbService db, DiscordSocketClient client, InteractiveService interactive, Bot bot)
     {
         _creds = creds;
         _db = db;
         _client = client;
         _interactive = interactive;
+        this.bot = bot;
+    }
+    
+    [SlashCommand("sudo", "Run a command as another user")]
+    [IsOwner]
+    public async Task Sudo(IUser user, string commandAndArgs)
+    {
+        await DeferAsync();
+        var msg = new AIOMessage
+        {
+            Content = commandAndArgs,
+            Author = user,
+            Channel = Context.Channel
+        };
+        try
+        {
+            await Context.Interaction.SendConfirmAsync("Attempting to run command...");
+            await bot.HandleCommandAsync(msg);
+        }
+        catch (Exception e)
+        {
+            await Context.Interaction.SendErrorAsync($"Error: {e}");
+        }
     }
     
     [SlashCommand("leaveinactive", "Leave inactive servers")]

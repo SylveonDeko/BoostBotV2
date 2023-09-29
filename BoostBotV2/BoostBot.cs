@@ -133,6 +133,18 @@ namespace BoostBotV2
 
             Log.Information("Processing {Count} online tokens to online....", toProcess.Count);
             _ = Task.Run(async () => await ProcessTokensInChunks(toProcess).ConfigureAwait(false));
+            
+            // gotta wait wait wait
+            var tcs = new TaskCompletionSource<bool>();
+            Task ClientReady()
+            {
+                tcs.SetResult(true);
+                _client.Ready -= ClientReady;
+                return Task.CompletedTask;
+            }
+            _client.Ready += ClientReady;
+            await tcs.Task.ConfigureAwait(false);
+            
             _client.MessageReceived += HandleCommandAsync;
             _client.InteractionCreated += HandleInteractionAsync;
         }

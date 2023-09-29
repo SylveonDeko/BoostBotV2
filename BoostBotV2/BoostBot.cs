@@ -135,6 +135,7 @@ namespace BoostBotV2
             _ = Task.Run(async () => await ProcessTokensInChunks(toProcess).ConfigureAwait(false));
             
             // gotta wait wait wait
+            Log.Information("Waiting for client to be ready...");
             var tcs = new TaskCompletionSource<bool>();
             Task ClientReady()
             {
@@ -145,6 +146,7 @@ namespace BoostBotV2
             _client.Ready += ClientReady;
             await tcs.Task.ConfigureAwait(false);
             
+            Log.Information("Client ready!");
             _client.MessageReceived += HandleCommandAsync;
             _client.InteractionCreated += HandleInteractionAsync;
         }

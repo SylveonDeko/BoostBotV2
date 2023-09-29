@@ -210,7 +210,7 @@ namespace BoostBotV2
                 await interactionService.AddModulesAsync(Assembly.GetEntryAssembly(), Services)
                     .ConfigureAwait(false);
 #if !DEBUG
-        if (Client.ShardId == 0)
+        if (_client.ShardId == 0)
             await interactionService.RegisterCommandsGloballyAsync(true).ConfigureAwait(false);
 #endif
 #if DEBUG

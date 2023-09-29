@@ -60,12 +60,16 @@ public class Onliner
             }
             catch (Exception ex)
             {
+                if (ex.Message == "Terminating due to critical WebSocket exception.")
+                {
+                    return; // Terminate the method without retrying
+                }
                 retryCount++;
                 Log.Error($"Error on connection attempt {retryCount}: {ex.Message}");
 
+
                 if (retryCount >= MaxRetries)
                 {
-                    Log.Fatal("Max retries reached. Throwing exception...");
                     throw;
                 }
 
@@ -111,50 +115,56 @@ public class Onliner
     
     
     private async Task EstablishWebSocket()
+{
+    if (_ws is null or  { State: WebSocketState.Closed or WebSocketState.Aborted or WebSocketState.None })
     {
-        if (_ws is null or  { State: WebSocketState.Closed or WebSocketState.Aborted or WebSocketState.None })
-        {
-            _ws?.Dispose();  // Dispose of the old instance if it exists
-            _ws = new ClientWebSocket(); // Create a new instance
-        }
-        switch (_ws.State)
-        {
-            case WebSocketState.None:
-            case WebSocketState.Closed:
-                try
-                {
-                    var randomProxy = Proxies.Value[_proxyRandom.Next(Proxies.Value.Count)];
-                    var proxy = new WebProxy(randomProxy);
-                    var parts = randomProxy.Split('@');
-                    var credentials = parts[0].Split(':');
-                    proxy.Credentials = new NetworkCredential(credentials[0], credentials[1]);
-                    _ws.Options.Proxy = proxy;
-                    await _ws.ConnectAsync(new Uri("wss://gateway.discord.gg/?v=6&encoding=json"), CancellationToken.None);
-                }
-                catch (WebSocketException wsEx)
-                {
-                    Log.Error($"WebSocket exception: {wsEx.Message}");
-                }
-                catch (TimeoutException te)
-                {
-                    Log.Error($"Timeout exception: {te.Message}");
-                }
-                catch (Exception ex)
-                {
-                    Log.Error($"An unknown error occurred: {ex.Message}");
-                }
-                break;
-            
-            case WebSocketState.CloseReceived:
-                Log.Warning("WebSocket is in CloseReceived state. Attempting to close properly...");
-                await _ws.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
-                break;
-            
-            default:
-                Log.Warning($"WebSocket is already in state: {_ws.State}");
-                break;
-        }
+        _ws?.Dispose();  // Dispose of the old instance if it exists
+        _ws = new ClientWebSocket(); // Create a new instance
     }
+    switch (_ws.State)
+    {
+        case WebSocketState.None:
+        case WebSocketState.Closed:
+            try
+            {
+                var randomProxy = Proxies.Value[_proxyRandom.Next(Proxies.Value.Count)];
+                var proxy = new WebProxy(randomProxy);
+                var parts = randomProxy.Split('@');
+                var credentials = parts[0].Split(':');
+                proxy.Credentials = new NetworkCredential(credentials[0], credentials[1]);
+                _ws.Options.Proxy = proxy;
+                await _ws.ConnectAsync(new Uri("wss://gateway.discord.gg/?v=6&encoding=json"), CancellationToken.None);
+            }
+            catch (WebSocketException wsEx)
+            {
+                if (wsEx.Message.Contains("Unable to connect to the remote server"))
+                {
+                    _ws.Dispose(); // Dispose the WebSocket
+                    _ws = null;    // Set the WebSocket to null
+                    throw new Exception("Terminating due to critical WebSocket exception."); // Throw an exception to break out of the loop
+                }
+            }
+            catch (TimeoutException te)
+            {
+                Log.Error($"Timeout exception: {te.Message}");
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"An unknown error occurred: {ex.Message}");
+            }
+            break;
+        
+        case WebSocketState.CloseReceived:
+            Log.Warning("WebSocket is in CloseReceived state. Attempting to close properly...");
+            await _ws.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
+            break;
+        
+        default:
+            Log.Warning($"WebSocket is already in state: {_ws.State}");
+            break;
+    }
+}
+
 
     private async Task<int> ExtractHeartbeatInterval()
     {
@@ -457,9 +467,8 @@ public class Onliner
                 cancellationToken: CancellationToken.None
             );
         }
-        catch (Exception e)
+        catch
         {
-            Log.Error("Error sending websocket message: {0}", e.Message);
             _ws?.Dispose();
             _ws = new ClientWebSocket();
             await Connect();

@@ -72,7 +72,6 @@ namespace BoostBotV2
             s.AddHttpClient<DiscordAuthService>();
             Services = s.BuildServiceProvider();
 
-
             sw.Stop();
             Log.Information("All services loaded in {ElapsedTotalSeconds}s", sw.Elapsed.TotalSeconds);
         }
@@ -80,7 +79,6 @@ namespace BoostBotV2
         private async Task LoginAsync(string token)
         {
             _client.Log += Client_Log;
-            var clientReady = new TaskCompletionSource<bool>();
 
             //connect
             Log.Information("Bot logging in ...");
@@ -135,44 +133,8 @@ namespace BoostBotV2
 
             Log.Information("Processing {Count} online tokens to online....", toProcess.Count);
             _ = Task.Run(async () => await ProcessTokensInChunks(toProcess).ConfigureAwait(false));
-
-            _client.Ready += ShardReady;
-            await clientReady.Task.ConfigureAwait(false);
-            Log.Information("Ready!");
-        }
-
-        private async Task ShardReady()
-        {
-            try
-            {
-                try
-                {
-                    await _commands.AddModulesAsync(Assembly.GetEntryAssembly(), Services);
-                }
-                catch (Exception e)
-                {
-                    Log.Error("Error adding Modules\n{0}", e);
-                }
-
-                _client.MessageReceived += HandleCommandAsync;
-                var service = Services.GetRequiredService<InteractionService>();
-                await service.AddModulesAsync(Assembly.GetEntryAssembly(), Services);
-#if DEBUG
-                await service.RegisterCommandsToGuildAsync(Credentials.CommandGuild);
-#else
-                await service.RegisterCommandsGloballyAsync(true);
-#endif
-
-                _client.InteractionCreated += HandleInteractionAsync;
-                Tokens = (await File.ReadAllLinesAsync("tokens.txt")).ToHashSet();
-                OnlineTokens = (await File.ReadAllLinesAsync("onlinetokens.txt")).ToHashSet();
-                service.SlashCommandExecuted += HandleCommands;
-            }
-            catch (Exception e)
-            {
-                Log.Error("Error while starting up\n{0}", e);
-                throw;
-            }
+            _client.MessageReceived += HandleCommandAsync;
+            _client.InteractionCreated += HandleInteractionAsync;
         }
 
         private Task HandleInteractionAsync(SocketInteraction arg)
@@ -195,6 +157,9 @@ namespace BoostBotV2
 
                 var context = new InteractionContext(_client, arg);
                 var service = Services.GetRequiredService<InteractionService>();
+                service.SlashCommandExecuted += HandleCommands;
+                _client.InteractionCreated -= HandleInteractionAsync;
+                _client.MessageReceived -= HandleCommandAsync;
                 await service.ExecuteCommandAsync(context, Services);
             });
             return Task.CompletedTask;
@@ -203,41 +168,63 @@ namespace BoostBotV2
 
         private async Task RunAsync()
         {
-            var sw = Stopwatch.StartNew();
-            if (string.IsNullOrEmpty(Credentials.BotToken))
+            try
             {
-                Log.Error("Bot Token not set. Cannot start");
-                Environment.Exit(1);
-            }
+                var sw = Stopwatch.StartNew();
+                if (string.IsNullOrEmpty(Credentials.BotToken))
+                {
+                    Log.Error("Bot Token not set. Cannot start");
+                    Environment.Exit(1);
+                }
 
-            if (Credentials.CommandGuild is 0)
-            {
-                Log.Error("Command Guild not specified, cannot start");
-                Environment.Exit(1);
-            }
+                if (Credentials.CommandGuild is 0)
+                {
+                    Log.Error("Command Guild not specified, cannot start");
+                    Environment.Exit(1);
+                }
 
-            if (File.Exists("tokens.txt"))
-            {
-                Tokens = (await File.ReadAllLinesAsync("tokens.txt")).ToHashSet();
-            }
-            else
-            {
-                File.Create("tokens.txt");
-            }
+                if (File.Exists("tokens.txt"))
+                {
+                    Tokens = (await File.ReadAllLinesAsync("tokens.txt")).ToHashSet();
+                }
+                else
+                {
+                    File.Create("tokens.txt");
+                }
 
-            if (File.Exists("onlinetokens.txt"))
-            {
-                OnlineTokens = (await File.ReadAllLinesAsync("onlinetokens.txt")).ToHashSet();
-            }
-            else
-            {
-                File.Create("onlinetokens.txt");
-            }
+                if (File.Exists("onlinetokens.txt"))
+                {
+                    OnlineTokens = (await File.ReadAllLinesAsync("onlinetokens.txt")).ToHashSet();
+                }
+                else
+                {
+                    File.Create("onlinetokens.txt");
+                }
 
-            await LoginAsync(Credentials.BotToken).ConfigureAwait(false);
+                await LoginAsync(Credentials.BotToken).ConfigureAwait(false);
+                Log.Information("Loading commands...");
+                var commandService = Services.GetService<CommandService>();
+                var interactionService = Services.GetRequiredService<InteractionService>();
+                await commandService.AddModulesAsync(Assembly.GetEntryAssembly(), Services)
+                    .ConfigureAwait(false);
+                await interactionService.AddModulesAsync(Assembly.GetEntryAssembly(), Services)
+                    .ConfigureAwait(false);
+#if !DEBUG
+        if (Client.ShardId == 0)
+            await interactionService.RegisterCommandsGloballyAsync(true).ConfigureAwait(false);
+#endif
+#if DEBUG
+                if (_client.Guilds.Select(x => x.Id).Contains(Credentials.CommandGuild))
+                    await interactionService.RegisterCommandsToGuildAsync(Credentials.CommandGuild);
+#endif
 
-            sw.Stop();
-            Log.Information("Client connected in {Elapsed:F2}s", sw.Elapsed.TotalSeconds);
+                sw.Stop();
+                Log.Information("Client connected and commands loaded in {Elapsed:F2}s", sw.Elapsed.TotalSeconds);
+            }
+            catch (Exception e)
+            {
+                Log.Error(e, "Error while running");
+            }
         }
 
         private static Task Client_Log(LogMessage arg)
@@ -434,7 +421,7 @@ namespace BoostBotV2
             return Task.CompletedTask;
         }
 
-        private static async Task ProcessTokensInChunks(IEnumerable<string> tokens)
+        private async Task ProcessTokensInChunks(IEnumerable<string> tokens)
         {
             var tasks = tokens.Select(async token =>
             {

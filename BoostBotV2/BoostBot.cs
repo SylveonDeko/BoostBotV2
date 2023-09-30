@@ -147,8 +147,6 @@ namespace BoostBotV2
             await tcs.Task.ConfigureAwait(false);
             
             Log.Information("Client ready!");
-            _client.MessageReceived += HandleCommandAsync;
-            _client.InteractionCreated += HandleInteractionAsync;
         }
 
         private Task HandleInteractionAsync(SocketInteraction arg)
@@ -216,6 +214,8 @@ namespace BoostBotV2
                 }
 
                 await LoginAsync(Credentials.BotToken).ConfigureAwait(false);
+                _client.MessageReceived += HandleCommandAsync;
+                _client.InteractionCreated += HandleInteractionAsync;
                 Log.Information("Loading commands...");
                 var commandService = Services.GetService<CommandService>();
                 var interactionService = Services.GetRequiredService<InteractionService>();
